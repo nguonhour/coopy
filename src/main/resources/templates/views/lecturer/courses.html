@@ -8,6 +8,17 @@
     <title>My Courses</title>
   </head>
   <body class="bg-slate-100 font-sans">
+    <!-- Error Message Display -->
+    <div th:if="${error}" class="max-w-2xl mx-auto mt-6">
+      <div
+        class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+        role="alert"
+      >
+        <span class="block sm:inline" th:text="${error}"
+          >An error occurred.</span
+        >
+      </div>
+    </div>
     <!-- Sidebar Navigation -->
     <aside class="fixed left-0 top-0 h-full w-64 bg-slate-900 text-white z-10">
       <div class="flex flex-col h-full">
@@ -157,6 +168,20 @@
 
     <!-- Main Content -->
     <div class="ml-64 px-8 py-8">
+      <div class="flex justify-end mb-4 space-x-2">
+        <button
+          id="newOfferingBtn"
+          class="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
+        >
+          New Offering
+        </button>
+        <a
+          th:href="@{/lecturer/courses/export(lecturerId=${lecturerId})}"
+          class="inline-flex items-center px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+        >
+          Export Courses (CSV)
+        </a>
+      </div>
       <!-- Empty State -->
       <div
         th:if="${courses == null or courses.isEmpty()}"
@@ -183,46 +208,74 @@
 
       <!-- Courses Grid -->
       <div
-        th:if="${courses != null and !courses.isEmpty()}"
+        th:if="${offerings != null and !offerings.isEmpty()}"
         class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
       >
         <div
-          th:each="course : ${courses}"
-          class="bg-white overflow-hidden shadow-sm rounded-xl border border-slate-200 hover:shadow-lg hover:border-blue-300 transition"
+          th:each="off : ${offerings}"
+          class="bg-white overflow-hidden shadow-lg rounded-2xl border border-slate-200 hover:shadow-2xl hover:border-blue-400 transition-all duration-300 group relative"
         >
-          <div class="p-6">
+          <div class="p-6 flex flex-col h-full">
             <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <div
+                  class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-400 to-indigo-500 flex items-center justify-center shadow-md"
+                >
+                  <span
+                    class="text-white text-lg font-bold"
+                    th:text="${off.course.courseCode.substring(0,2)}"
+                    >CS</span
+                  >
+                </div>
+                <span
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
+                  th:text="${off.course.courseCode}"
+                  >CS101</span
+                >
+              </div>
               <span
-                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                th:text="${course.courseCode}"
-                >CS101</span
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide shadow-sm border"
+                th:classappend="${off.active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}"
+                th:title="${off.active ? 'This offering is active' : 'This offering is inactive'}"
               >
-              <span
-                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                th:classappend="${course.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}"
-              >
-                <span th:text="${course.active ? 'Active' : 'Inactive'}"
+                <svg
+                  th:if="${off.active}"
+                  class="w-3 h-3 mr-1 text-green-500 animate-pulse"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <circle cx="10" cy="10" r="10" />
+                </svg>
+                <svg
+                  th:if="${!off.active}"
+                  class="w-3 h-3 mr-1 text-red-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <circle cx="10" cy="10" r="10" />
+                </svg>
+                <span th:text="${off.active ? 'Active' : 'Inactive'}"
                   >Active</span
                 >
               </span>
             </div>
 
             <h3
-              class="text-lg font-semibold text-gray-900 mb-2"
-              th:text="${course.title}"
+              class="text-xl font-extrabold text-slate-900 mb-1 group-hover:text-blue-700 transition-colors duration-200"
+              th:text="${off.course.title}"
             >
               Course Title
             </h3>
             <p
-              class="text-sm text-gray-500 mb-4 line-clamp-2"
-              th:text="${course.description ?: 'No description available'}"
+              class="text-sm text-slate-500 mb-4 line-clamp-2"
+              th:text="${off.course.description ?: 'No description available'}"
             >
               Course description...
             </p>
 
-            <div class="flex items-center text-sm text-gray-500 mb-4">
+            <div class="flex items-center text-sm text-slate-500 mb-4 gap-2">
               <svg
-                class="mr-1.5 h-5 w-5 text-gray-400"
+                class="h-5 w-5 text-blue-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -234,16 +287,22 @@
                   d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                 />
               </svg>
-              <span th:text="${course.credits} + ' Credits'">3 Credits</span>
+              <span th:text="${off.capacity} + ' Seats'">30 Seats</span>
+              <span
+                class="ml-2 px-2 py-0.5 rounded bg-slate-100 text-xs font-medium text-slate-600"
+                th:text="${off.term.termName}"
+                >Term</span
+              >
             </div>
 
-            <div class="flex space-x-2">
+            <div class="flex space-x-2 mt-auto">
               <a
-                th:href="@{/lecturer/students(offeringId=${course.id},lecturerId=${lecturerId})}"
-                class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                th:href="@{/lecturer/students(offeringId=${off.id},lecturerId=${lecturerId})}"
+                class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-gray-200 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-blue-50 hover:text-blue-700 transition"
+                title="View enrolled students"
               >
                 <svg
-                  class="-ml-1 mr-2 h-5 w-5 text-gray-400"
+                  class="-ml-1 mr-2 h-5 w-5 text-blue-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -257,9 +316,12 @@
                 </svg>
                 Students
               </a>
-              <button
-                type="button"
-                class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+              <a
+                href="#"
+                class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition"
+                th:attr="data-offering-id=${off.id}"
+                onclick="openEditModal(this)"
+                title="Edit this offering"
               >
                 <svg
                   class="-ml-1 mr-2 h-5 w-5"
@@ -271,15 +333,269 @@
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     stroke-width="2"
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"
+                  ></path>
                 </svg>
-                Schedule
+                Edit
+              </a>
+              <button
+                type="button"
+                class="flex-1 inline-flex justify-center items-center px-3 py-2 border border-red-200 shadow-sm text-sm font-medium rounded-lg text-white bg-red-500 hover:bg-red-700 transition"
+                th:attr="data-offering-id=${off.id}"
+                onclick="deleteOffering(this)"
+                title="Delete this offering"
+              >
+                Delete
               </button>
+            </div>
+            <div class="absolute top-2 right-2">
+              <span
+                class="px-2 py-0.5 rounded-full bg-slate-50 text-xs text-slate-400 border border-slate-200 shadow"
+                th:text="'ID: ' + ${off.id}"
+              ></span>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Modal: Create / Edit Offering -->
+      <div
+        id="offeringModal"
+        class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-40 animate-fadein"
+        style="backdrop-filter: blur(2px)"
+      >
+        <div
+          class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100 transition-all duration-300 transform scale-95 hover:scale-100"
+        >
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-2xl font-extrabold text-slate-900" id="modalTitle">
+              New Offering
+            </h3>
+            <button
+              type="button"
+              onclick="closeModal()"
+              class="text-slate-400 hover:text-slate-700 text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-400 rounded-full px-2 transition"
+              title="Close"
+            >
+              &times;
+            </button>
+          </div>
+          <form id="offeringForm" class="space-y-5">
+            <input type="hidden" id="offeringId" />
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1"
+                >Course <span class="text-red-500">*</span></label
+              >
+              <select
+                id="courseId"
+                class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                required
+              >
+                <option value="">Select Course</option>
+                <option
+                  th:each="course : ${courses}"
+                  th:value="${course.id}"
+                  th:text="${course.courseCode + ' - ' + course.title}"
+                ></option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1"
+                >Term <span class="text-red-500">*</span></label
+              >
+              <select
+                id="termId"
+                class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                required
+              >
+                <option value="">Select Term</option>
+                <option
+                  th:each="term : ${terms}"
+                  th:value="${term.id}"
+                  th:text="${term.termName}"
+                ></option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1"
+                >Capacity <span class="text-red-500">*</span></label
+              >
+              <input
+                id="capacity"
+                type="number"
+                min="1"
+                class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                value="30"
+                required
+              />
+            </div>
+            <div class="flex items-center">
+              <input
+                id="active"
+                type="checkbox"
+                class="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500 transition"
+                checked
+              />
+              <label for="active" class="ml-2 text-sm text-slate-700"
+                >Active</label
+              >
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onclick="closeModal()"
+                class="px-5 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 font-semibold transition focus:ring-2 focus:ring-blue-400"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="px-5 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition focus:ring-2 focus:ring-blue-400"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <style>
+        @keyframes fadein {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        .animate-fadein {
+          animation: fadein 0.3s;
+        }
+      </style>
+
+      <script th:inline="javascript">
+        /*<![CDATA[*/
+        var lecturerId = /*[[${lecturerId}]]*/ 0;
+        /*]]>*/
+      </script>
+
+      <script>
+        // Toast notification
+        function showToast(msg, type = "success") {
+          let toast = document.createElement("div");
+          toast.className = `fixed top-6 right-6 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-semibold text-sm transition-all duration-500 ${
+            type === "success" ? "bg-green-600" : "bg-red-600"
+          }`;
+          toast.innerText = msg;
+          document.body.appendChild(toast);
+          setTimeout(() => {
+            toast.classList.add("opacity-0");
+          }, 1800);
+          setTimeout(() => {
+            toast.remove();
+          }, 2200);
+        }
+
+        document
+          .getElementById("newOfferingBtn")
+          .addEventListener("click", function () {
+            openCreateModal();
+          });
+
+        function openCreateModal() {
+          document.getElementById("modalTitle").innerText = "New Offering";
+          document.getElementById("offeringId").value = "";
+          document.getElementById("courseId").value = "";
+          document.getElementById("termId").value = "";
+          document.getElementById("capacity").value = 30;
+          document.getElementById("active").checked = true;
+          document.getElementById("offeringModal").classList.remove("hidden");
+          document.getElementById("offeringModal").classList.add("flex");
+        }
+
+        function openEditModal(el) {
+          var id = el.getAttribute("data-offering-id");
+          document.getElementById("modalTitle").innerText = "Edit Offering";
+          document.getElementById("offeringId").value = id;
+          // Optionally, fetch and populate real data here for edit UX
+          document.getElementById("courseId").value = "";
+          document.getElementById("termId").value = "";
+          document.getElementById("capacity").value = 30;
+          document.getElementById("active").checked = true;
+          document.getElementById("offeringModal").classList.remove("hidden");
+          document.getElementById("offeringModal").classList.add("flex");
+        }
+
+        function closeModal() {
+          document.getElementById("offeringModal").classList.add("hidden");
+          document.getElementById("offeringModal").classList.remove("flex");
+        }
+
+        document
+          .getElementById("offeringForm")
+          .addEventListener("submit", async function (e) {
+            e.preventDefault();
+            var id = document.getElementById("offeringId").value;
+            var courseId = document.getElementById("courseId").value;
+            var termId = document.getElementById("termId").value;
+            var capacity = document.getElementById("capacity").value;
+            // Validation
+            if (!courseId || !termId || !capacity) {
+              showToast("Please fill all required fields.", "error");
+              return;
+            }
+            var payload = {
+              courseId: parseInt(courseId),
+              termId: parseInt(termId),
+              capacity: parseInt(capacity),
+              active: document.getElementById("active").checked,
+            };
+            // Show loading spinner on Save
+            let saveBtn = document.querySelector(
+              "#offeringForm button[type='submit']"
+            );
+            let origText = saveBtn.innerHTML;
+            saveBtn.innerHTML =
+              '<svg class="animate-spin h-5 w-5 mr-2 inline-block text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>Saving...';
+            saveBtn.disabled = true;
+            try {
+              var url =
+                "/api/lecturer/offerings" +
+                (id ? "/" + id : "") +
+                "?lecturerId=" +
+                lecturerId;
+              var method = id ? "PUT" : "POST";
+              var res = await fetch(url, {
+                method: method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+              if (!res.ok) throw new Error("Request failed");
+              showToast("Offering saved successfully.", "success");
+              setTimeout(() => location.reload(), 900);
+            } catch (err) {
+              showToast("Error saving offering: " + err.message, "error");
+            } finally {
+              saveBtn.innerHTML = origText;
+              saveBtn.disabled = false;
+            }
+          });
+
+        async function deleteOffering(el) {
+          var id = el.getAttribute("data-offering-id");
+          if (!confirm("Delete offering #" + id + "?")) return;
+          try {
+            var res = await fetch(
+              "/api/lecturer/offerings/" + id + "?lecturerId=" + lecturerId,
+              { method: "DELETE" }
+            );
+            if (!res.ok) throw new Error("Delete failed");
+            showToast("Offering deleted.", "success");
+            setTimeout(() => location.reload(), 700);
+          } catch (err) {
+            showToast("Error deleting offering: " + err.message, "error");
+          }
+        }
+      </script>
     </div>
   </body>
 </html>

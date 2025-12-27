@@ -8,6 +8,17 @@
     <title>Enrolled Students</title>
   </head>
   <body class="bg-slate-100 font-sans">
+    <!-- Error Message Display -->
+    <div th:if="${error}" class="max-w-2xl mx-auto mt-6">
+      <div
+        class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+        role="alert"
+      >
+        <span class="block sm:inline" th:text="${error}"
+          >An error occurred.</span
+        >
+      </div>
+    </div>
     <!-- Sidebar Navigation -->
     <aside class="fixed left-0 top-0 h-full w-64 bg-slate-900 text-white z-10">
       <div class="flex flex-col h-full">
@@ -175,6 +186,16 @@
         </div>
       </div>
     </div>
+    <div class="ml-64 px-8 py-0">
+      <div class="flex justify-end -mt-6 mb-4">
+        <a
+          th:href="@{/lecturer/students/export(offeringId=${offeringId},lecturerId=${lecturerId})}"
+          class="inline-flex items-center px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+        >
+          Export Students (CSV)
+        </a>
+      </div>
+    </div>
 
     <!-- Main Content -->
     <div class="ml-64 px-8 py-8">
@@ -267,6 +288,18 @@
                 scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
+                Enrolled Date
+              </th>
+              <th
+                scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Deadline
+              </th>
+              <th
+                scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
                 Status
               </th>
               <th
@@ -278,12 +311,34 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr th:each="student : ${students}" class="hover:bg-gray-50">
+            <tr
+              th:each="student,iterStat : ${students}"
+              class="hover:bg-gray-50"
+            >
+              <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                <input
+                  type="checkbox"
+                  class="student-checkbox"
+                  th:value="${student.id}"
+                />
+              </td>
               <td
                 class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"
                 th:text="${student.idCard ?: 'N/A'}"
               >
                 STU001
+              </td>
+              <td
+                class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                th:text="${enrollments[iterStat.index]?.enrolledAt != null ? #temporals.format(enrollments[iterStat.index].enrolledAt, 'yyyy-MM-dd') : 'N/A'}"
+              >
+                2025-12-26
+              </td>
+              <td
+                class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                th:text="${enrollments[iterStat.index]?.offering?.term?.endDate != null ? #temporals.format(enrollments[iterStat.index].offering.term.endDate, 'yyyy-MM-dd') : 'N/A'}"
+              >
+                2026-01-31
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
@@ -293,7 +348,7 @@
                     >
                       <span
                         class="text-indigo-600 font-semibold text-sm"
-                        th:text="${student.firstName != null ? student.firstName.substring(0,1) : 'S'}"
+                        th:text="${student != null and student.firstName != null and #strings.length(student.firstName) > 0 ? student.firstName.substring(0,1) : 'S'}"
                         >S</span
                       >
                     </div>
@@ -301,7 +356,7 @@
                   <div class="ml-4">
                     <div
                       class="text-sm font-medium text-gray-900"
-                      th:text="${student.firstName + ' ' + student.lastName}"
+                      th:text="${student != null ? (student.firstName != null ? student.firstName : '' ) + ' ' + (student.lastName != null ? student.lastName : '') : 'N/A'}"
                     >
                       John Doe
                     </div>
@@ -310,16 +365,17 @@
               </td>
               <td
                 class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                th:text="${student.email}"
+                th:text="${student != null && student.email != null ? student.email : 'N/A'}"
               >
                 john@example.com
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span
                   class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                  th:classappend="${student.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}"
+                  th:classappend="${student != null && student.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}"
                 >
-                  <span th:text="${student.active ? 'Active' : 'Inactive'}"
+                  <span
+                    th:text="${student != null && student.active ? 'Active' : 'Inactive'}"
                     >Active</span
                   >
                 </span>
@@ -345,5 +401,19 @@
         </table>
       </div>
     </div>
+    <script>
+      (function () {
+        const input = document.getElementById("search");
+        if (!input) return;
+        input.addEventListener("input", function () {
+          const q = this.value.trim().toLowerCase();
+          const rows = document.querySelectorAll("tbody tr");
+          rows.forEach((r) => {
+            const text = r.textContent.toLowerCase();
+            r.style.display = q === "" || text.includes(q) ? "" : "none";
+          });
+        });
+      })();
+    </script>
   </body>
 </html>

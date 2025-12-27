@@ -8,11 +8,11 @@
         <version>3.5.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.cource</groupId>
-    <artifactId>demo</artifactId>
+    <groupId>com.course</groupId>
+    <artifactId>course-enrollment-system</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>demo</name>
-    <description>Demo project for Spring Boot</description>
+    <name>Course Enrollment System</name>
+    <description>Course Enrollment and Classroom Scheduling System</description>
     <url/>
     <licenses>
         <license/>

@@ -222,6 +222,14 @@
             </button>
           </div>
         </div>
+        <div class="mt-3 text-right">
+          <a
+            th:href="@{/lecturer/attendance/export(scheduleId=${scheduleId},lecturerId=${lecturerId})}"
+            class="inline-flex items-center px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+          >
+            Export Attendance (CSV)
+          </a>
+        </div>
       </div>
 
       <div
