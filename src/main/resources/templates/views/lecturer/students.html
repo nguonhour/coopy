@@ -386,15 +386,17 @@
                 <button
                   type="button"
                   class="text-indigo-600 hover:text-indigo-900 mr-3"
+                  th:href="@{/student/dashboard(studentId=${student.id})}"
+                  th:onclick="|window.location='@{/student/dashboard(studentId=${student.id})}'|"
                 >
                   View Details
                 </button>
-                <button
-                  type="button"
+                <a
                   class="text-green-600 hover:text-green-900"
+                  th:href="@{/lecturer/attendance(lecturerId=${lecturerId},offeringId=${offeringId},studentId=${student.id})}"
                 >
                   Attendance
-                </button>
+                </a>
               </td>
             </tr>
           </tbody>

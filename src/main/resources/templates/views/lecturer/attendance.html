@@ -174,13 +174,32 @@
       >
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <p class="text-sm font-medium text-gray-500">Schedule ID</p>
-            <p
-              class="mt-1 text-lg font-semibold text-gray-900"
-              th:text="${scheduleId ?: 'N/A'}"
-            >
-              -
-            </p>
+            <p class="text-sm font-medium text-gray-500">Schedule</p>
+            <div class="mt-1">
+              <th:block th:if="${schedules != null and !schedules.isEmpty()}">
+                <select
+                  id="schedule-select"
+                  class="block w-full rounded-md border-gray-300"
+                >
+                  <option
+                    th:each="sch : ${schedules}"
+                    th:value="${sch.id}"
+                    th:text="${sch.offering.course.courseCode + ' - ' + sch.dayOfWeek + ' ' + (sch.startTime != null ? sch.startTime : '')}"
+                    th:selected="${sch.id == scheduleId}"
+                  >
+                    Schedule
+                  </option>
+                </select>
+              </th:block>
+              <th:block th:if="${schedules == null or schedules.isEmpty()}">
+                <p
+                  class="mt-1 text-lg font-semibold text-gray-900"
+                  th:text="${scheduleId ?: 'N/A'}"
+                >
+                  -
+                </p>
+              </th:block>
+            </div>
           </div>
           <div>
             <p class="text-sm font-medium text-gray-500">Date</p>
@@ -424,6 +443,7 @@
                   <option
                     th:value="${s.id}"
                     th:text="${s.firstName + ' ' + s.lastName + ' (' + s.email + ')'}"
+                    th:selected="${initialStudentId != null and s.id == initialStudentId}"
                   ></option>
                 </th:block>
               </th:block>
@@ -544,6 +564,37 @@
             alert("Error: " + err);
           }
         });
+
+        // schedule selector: navigate to selected schedule
+        const scheduleSelect = document.getElementById("schedule-select");
+        if (scheduleSelect) {
+          scheduleSelect.addEventListener("change", function () {
+            const sid = this.value;
+            const lid = /*[[${lecturerId}]]*/ "null";
+            if (sid) {
+              const url =
+                "/lecturer/attendance?scheduleId=" +
+                encodeURIComponent(sid) +
+                (lid && lid !== "null"
+                  ? "&lecturerId=" + encodeURIComponent(lid)
+                  : "");
+              window.location.href = url;
+            }
+          });
+        }
+        // if an initial student was passed, open modal and preselect student
+        const initialStudentId = /*[[${initialStudentId}]]*/ "null";
+        if (initialStudentId && initialStudentId !== "null") {
+          const sel = document.getElementById("attendance-student");
+          if (sel) {
+            sel.value = initialStudentId;
+            // open modal automatically
+            if (modal) {
+              modal.classList.remove("hidden");
+              modal.classList.add("flex");
+            }
+          }
+        }
       </script>
 
       <div

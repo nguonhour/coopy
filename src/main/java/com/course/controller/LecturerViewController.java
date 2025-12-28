@@ -208,6 +208,8 @@ public class LecturerViewController {
     public String attendance(
             @RequestParam(required = false) Long scheduleId,
             @RequestParam(required = false) Long lecturerId,
+            @RequestParam(required = false) Long studentId,
+            @RequestParam(required = false) Long offeringId,
             Model model) {
         // TODO: After enabling security, get lecturerId from Authentication
         // If lecturer provided but no schedule selected, try to auto-select the first
@@ -226,6 +228,39 @@ public class LecturerViewController {
                 }
             } catch (Exception ignored) {
             }
+        }
+        // Provide schedules for the lecturer so the template can show a selector
+        if (lecturerId != null) {
+            try {
+                java.util.List<com.course.entity.ClassSchedule> schedules = new java.util.ArrayList<>();
+                var offerings = lecturerService.getOfferingsByLecturerId(lecturerId);
+                if (offerings != null) {
+                    for (var off : offerings) {
+                        try {
+                            var classSchedules = classScheduleRepository.findByOfferingId(off.getId());
+                            if (classSchedules != null) {
+                                schedules.addAll(classSchedules);
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                model.addAttribute("schedules", schedules);
+            } catch (Exception ignored) {
+                model.addAttribute("schedules", new java.util.ArrayList<>());
+            }
+        }
+
+        // Pass through an initial studentId (if any) so the attendance modal can
+        // preselect
+        if (studentId != null) {
+            model.addAttribute("initialStudentId", studentId);
+        } else {
+            model.addAttribute("initialStudentId", null);
+        }
+        // Also provide offeringId if supplied to help auto-select schedules
+        if (offeringId != null) {
+            model.addAttribute("offeringId", offeringId);
         }
 
         if (scheduleId != null && lecturerId != null) {
