@@ -30,4 +30,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
         List<Object[]> countByOfferingIdsSince(@Param("offeringIds") List<Long> offeringIds,
                         @Param("from") java.time.LocalDate from);
 
+        @Query("SELECT a FROM Attendance a JOIN FETCH a.enrollment e JOIN FETCH e.student s LEFT JOIN FETCH a.recordedBy rb WHERE a.schedule.offering.id = :offeringId AND a.attendanceDate BETWEEN :from AND :to ORDER BY a.attendanceDate, s.lastName, s.firstName")
+        List<Attendance> findByOfferingIdBetweenDates(@Param("offeringId") Long offeringId,
+                        @Param("from") java.time.LocalDate from,
+                        @Param("to") java.time.LocalDate to);
+
 }

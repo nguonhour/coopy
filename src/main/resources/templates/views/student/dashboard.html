@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html
+  lang="en"
+  xmlns:th="http://www.thymeleaf.org"
+  xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -103,17 +107,19 @@
             <div
               class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold"
             >
-              S
+              <span sec:authentication="name">U</span>
             </div>
             <div class="ml-3">
-              <p class="text-sm font-medium">Student</p>
+              <p class="text-sm font-medium" sec:authentication="name">
+                Student
+              </p>
               <p class="text-xs text-slate-400">
                 ID: <span th:text="${studentId}">1</span>
               </p>
             </div>
           </div>
           <a
-            href="/logout"
+            th:href="@{/signout}"
             class="mt-4 flex items-center px-4 py-2 text-sm text-red-400 rounded-lg hover:bg-slate-800 transition"
           >
             <svg

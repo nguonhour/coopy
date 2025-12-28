@@ -65,6 +65,11 @@ public class AdminViewController {
         return "views/admin/dashboard";
     }
 
+    @GetMapping("")
+    public String index() {
+        return "redirect:/admin/dashboard";
+    }
+
     @GetMapping("/users")
     public String users(@RequestParam(required = false) String roleCode, Model model) {
         if (roleCode != null && !roleCode.isEmpty()) {
