@@ -23,6 +23,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
         List<Attendance> findByScheduleId(Long scheduleId);
 
+        @Query("SELECT a FROM Attendance a JOIN FETCH a.enrollment e JOIN FETCH e.student s LEFT JOIN FETCH a.recordedBy rb WHERE a.schedule.id = :scheduleId")
+        List<Attendance> findByScheduleIdWithStudent(@Param("scheduleId") Long scheduleId);
+
         @Query("SELECT a.attendanceDate, COUNT(a) FROM Attendance a WHERE a.schedule.offering.id IN :offeringIds AND a.attendanceDate >= :from GROUP BY a.attendanceDate ORDER BY a.attendanceDate")
         List<Object[]> countByOfferingIdsSince(@Param("offeringIds") List<Long> offeringIds,
                         @Param("from") java.time.LocalDate from);

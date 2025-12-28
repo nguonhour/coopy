@@ -1,11 +1,13 @@
 package com.course.controller;
 
 import com.course.entity.ClassSchedule;
+import com.course.dto.schedule.ClassScheduleDTO;
 import com.course.repository.ClassScheduleRepository;
 import com.course.repository.RoomRepository;
 import com.course.entity.Room;
 import com.course.entity.CourseOffering;
 import com.course.repository.CourseOfferingRepository;
+import com.course.repository.CourseLecturerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,26 +28,38 @@ public class ScheduleController {
     @Autowired
     private CourseOfferingRepository courseOfferingRepository;
 
-    // Get all schedules (optionally by offering)
+    @Autowired
+    private CourseLecturerRepository courseLecturerRepository;
+
+    // Get all schedules (optionally by offering) — return DTOs to avoid
+    // lazy-serialization issues. Wrap in try/catch to surface errors in logs.
     @GetMapping
-    public List<ClassSchedule> getAll(@RequestParam(required = false) Long offeringId) {
-        if (offeringId != null) {
-            return classScheduleRepository.findByOfferingId(offeringId);
+    public ResponseEntity<?> getAll(@RequestParam(required = false) Long offeringId) {
+        try {
+            if (offeringId != null) {
+                return ResponseEntity.ok(
+                        com.course.dto.schedule.ClassScheduleMapper
+                                .toDtoList(classScheduleRepository.findByOfferingId(offeringId)));
+            }
+            return ResponseEntity
+                    .ok(com.course.dto.schedule.ClassScheduleMapper.toDtoList(classScheduleRepository.findAll()));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.status(500).body(java.util.Collections.singletonMap("message", ex.toString()));
         }
-        return classScheduleRepository.findAll();
     }
 
     // Get a single schedule
     @GetMapping("/{id}")
-    public ResponseEntity<ClassSchedule> getById(@PathVariable Long id) {
+    public ResponseEntity<ClassScheduleDTO> getById(@PathVariable Long id) {
         return classScheduleRepository.findById(id)
-                .map(ResponseEntity::ok)
+                .map(cs -> ResponseEntity.ok(toDto(cs)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     // Create a new schedule
     @PostMapping
-    public ResponseEntity<ClassSchedule> create(@RequestBody ClassSchedule schedule) {
+    public ResponseEntity<ClassScheduleDTO> create(@RequestBody ClassSchedule schedule) {
         // Validate offering and room
         if (schedule.getOffering() == null || schedule.getRoom() == null) {
             return ResponseEntity.badRequest().build();
@@ -57,12 +71,13 @@ public class ScheduleController {
         }
         schedule.setOffering(offering.get());
         schedule.setRoom(room.get());
-        return ResponseEntity.ok(classScheduleRepository.save(schedule));
+        ClassSchedule saved = classScheduleRepository.save(schedule);
+        return ResponseEntity.ok(toDto(saved));
     }
 
     // Update a schedule
     @PutMapping("/{id}")
-    public ResponseEntity<ClassSchedule> update(@PathVariable Long id, @RequestBody ClassSchedule schedule) {
+    public ResponseEntity<ClassScheduleDTO> update(@PathVariable Long id, @RequestBody ClassSchedule schedule) {
         return classScheduleRepository.findById(id)
                 .map(existing -> {
                     if (schedule.getOffering() != null) {
@@ -80,7 +95,8 @@ public class ScheduleController {
                         existing.setStartTime(schedule.getStartTime());
                     if (schedule.getEndTime() != null)
                         existing.setEndTime(schedule.getEndTime());
-                    return ResponseEntity.ok(classScheduleRepository.save(existing));
+                    ClassSchedule saved = classScheduleRepository.save(existing);
+                    return ResponseEntity.ok(toDto(saved));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -93,5 +109,189 @@ public class ScheduleController {
         }
         classScheduleRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // Compatibility endpoint: create schedule from form/URL params
+    // (lecturer-friendly)
+    @PostMapping("/create-from-params")
+    public ResponseEntity<?> createFromParams(
+            @RequestParam Long lecturerId,
+            @RequestParam Long offeringId,
+            @RequestParam String dayOfWeek,
+            @RequestParam String startTime,
+            @RequestParam String endTime,
+            @RequestParam String roomNumber,
+            @RequestParam(required = false) String building,
+            @RequestParam(required = false) String roomType) {
+        // verify lecturer is assigned to offering
+        boolean assigned = courseLecturerRepository.existsByOfferingIdAndLecturerId(offeringId, lecturerId);
+        if (!assigned) {
+            return ResponseEntity.status(403).body("Lecturer is not assigned to this offering");
+        }
+        var offeringOpt = courseOfferingRepository.findById(offeringId);
+        if (offeringOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Invalid offeringId");
+        }
+
+        java.time.LocalTime start;
+        java.time.LocalTime end;
+        try {
+            start = java.time.LocalTime.parse(startTime);
+            end = java.time.LocalTime.parse(endTime);
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body("Invalid time format. Use HH:mm or HH:mm:ss");
+        }
+
+        Room room = roomRepository.findByRoomNumber(roomNumber).orElseGet(() -> {
+            Room r = new Room();
+            r.setRoomNumber(roomNumber);
+            r.setBuilding(building != null ? building : "");
+            r.setCapacity(0);
+            r.setRoomType(roomType != null ? roomType : "");
+            return roomRepository.save(r);
+        });
+        // if room exists but building/roomType provided and fields empty, update them
+        boolean changed = false;
+        if (room.getBuilding() == null || room.getBuilding().isEmpty()) {
+            if (building != null && !building.isEmpty()) {
+                room.setBuilding(building);
+                changed = true;
+            }
+        }
+        if (room.getRoomType() == null || room.getRoomType().isEmpty()) {
+            if (roomType != null && !roomType.isEmpty()) {
+                room.setRoomType(roomType);
+                changed = true;
+            }
+        }
+        if (changed)
+            roomRepository.save(room);
+
+        ClassSchedule cs = new ClassSchedule();
+        cs.setOffering(offeringOpt.get());
+        cs.setRoom(room);
+        cs.setDayOfWeek(dayOfWeek);
+        cs.setStartTime(start);
+        cs.setEndTime(end);
+
+        ClassSchedule saved = classScheduleRepository.save(cs);
+        return ResponseEntity.ok(toDto(saved));
+    }
+
+    // Compatibility endpoint: update schedule from form/URL params
+    @PostMapping("/update-from-params")
+    public ResponseEntity<?> updateFromParams(
+            @RequestParam(required = false) Long scheduleId,
+            @RequestParam Long lecturerId,
+            @RequestParam Long offeringId,
+            @RequestParam String dayOfWeek,
+            @RequestParam String startTime,
+            @RequestParam String endTime,
+            @RequestParam String roomNumber,
+            @RequestParam(required = false) String building,
+            @RequestParam(required = false) String roomType) {
+        // verify lecturer is assigned to offering
+        boolean assigned = courseLecturerRepository.existsByOfferingIdAndLecturerId(offeringId, lecturerId);
+        if (!assigned) {
+            return ResponseEntity.status(403).body("Lecturer is not assigned to this offering");
+        }
+        var offeringOpt = courseOfferingRepository.findById(offeringId);
+        if (offeringOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Invalid offeringId");
+        }
+
+        java.time.LocalTime start;
+        java.time.LocalTime end;
+        try {
+            start = java.time.LocalTime.parse(startTime);
+            end = java.time.LocalTime.parse(endTime);
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body("Invalid time format. Use HH:mm or HH:mm:ss");
+        }
+
+        Room room = roomRepository.findByRoomNumber(roomNumber).orElseGet(() -> {
+            Room r = new Room();
+            r.setRoomNumber(roomNumber);
+            r.setBuilding(building != null ? building : "");
+            r.setCapacity(0);
+            r.setRoomType(roomType != null ? roomType : "");
+            return roomRepository.save(r);
+        });
+        boolean changed = false;
+        if (room.getBuilding() == null || room.getBuilding().isEmpty()) {
+            if (building != null && !building.isEmpty()) {
+                room.setBuilding(building);
+                changed = true;
+            }
+        }
+        if (room.getRoomType() == null || room.getRoomType().isEmpty()) {
+            if (roomType != null && !roomType.isEmpty()) {
+                room.setRoomType(roomType);
+                changed = true;
+            }
+        }
+        if (changed)
+            roomRepository.save(room);
+
+        ClassSchedule cs;
+        if (scheduleId != null) {
+            cs = classScheduleRepository.findById(scheduleId).orElse(null);
+            if (cs == null) {
+                return ResponseEntity.notFound().build();
+            }
+            cs.setOffering(offeringOpt.get());
+            cs.setRoom(room);
+            cs.setDayOfWeek(dayOfWeek);
+            cs.setStartTime(start);
+            cs.setEndTime(end);
+        } else {
+            cs = new ClassSchedule();
+            cs.setOffering(offeringOpt.get());
+            cs.setRoom(room);
+            cs.setDayOfWeek(dayOfWeek);
+            cs.setStartTime(start);
+            cs.setEndTime(end);
+        }
+
+        ClassSchedule saved = classScheduleRepository.save(cs);
+        return ResponseEntity.ok(toDto(saved));
+    }
+
+    // Convert entity to DTO for safe JSON serialization
+    private ClassScheduleDTO toDto(ClassSchedule cs) {
+        ClassScheduleDTO dto = new ClassScheduleDTO();
+        dto.setId(cs.getId());
+        ClassScheduleDTO.RoomDTO room = new ClassScheduleDTO.RoomDTO();
+        if (cs.getRoom() != null) {
+            room.setId(cs.getRoom().getId());
+            room.setRoomNumber(cs.getRoom().getRoomNumber());
+            room.setBuilding(cs.getRoom().getBuilding());
+            room.setRoomType(cs.getRoom().getRoomType());
+        }
+        dto.setRoom(room);
+        dto.setDayOfWeek(cs.getDayOfWeek());
+        dto.setStartTime(cs.getStartTime() != null ? cs.getStartTime().toString() : null);
+        dto.setEndTime(cs.getEndTime() != null ? cs.getEndTime().toString() : null);
+        if (cs.getOffering() != null) {
+            ClassScheduleDTO.OfferingDTO off = new ClassScheduleDTO.OfferingDTO();
+            off.setId(cs.getOffering().getId());
+            off.setCapacity(cs.getOffering().getCapacity());
+            off.setActive(cs.getOffering().isActive());
+            if (cs.getOffering().getCourse() != null) {
+                ClassScheduleDTO.CourseDTO c = new ClassScheduleDTO.CourseDTO();
+                c.setId(cs.getOffering().getCourse().getId());
+                c.setCourseCode(cs.getOffering().getCourse().getCourseCode());
+                c.setTitle(cs.getOffering().getCourse().getTitle());
+                off.setCourse(c);
+            }
+            if (cs.getOffering().getTerm() != null) {
+                ClassScheduleDTO.TermDTO t = new ClassScheduleDTO.TermDTO();
+                t.setId(cs.getOffering().getTerm().getId());
+                t.setTermName(cs.getOffering().getTerm().getTermName());
+                off.setTerm(t);
+            }
+            dto.setOffering(off);
+        }
+        return dto;
     }
 }

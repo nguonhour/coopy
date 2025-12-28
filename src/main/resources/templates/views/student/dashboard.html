@@ -164,7 +164,13 @@
         </div>
         <div class="bg-white rounded-lg shadow p-6">
           <div class="text-gray-500 text-sm font-medium">Overall GPA</div>
-          <div class="text-3xl font-bold text-yellow-600 mt-2">3.85</div>
+          <div
+            class="text-3xl font-bold text-yellow-600 mt-2"
+            th:text="${gpa != null ? gpa : 'N/A'}"
+          >
+            3.85
+          </div>
+          <div class="text-xs text-gray-500 mt-1">Out of 4.00</div>
         </div>
       </div>
 

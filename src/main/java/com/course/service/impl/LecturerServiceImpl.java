@@ -107,12 +107,153 @@ public class LecturerServiceImpl implements LecturerService {
     }
 
     @Override
-    public List<Attendance> getAttendanceRecords(long scheduleId, long lecturerId) {
+    public com.course.entity.Attendance updateAttendance(long attendanceId, AttendanceRequestDTO dto, Long lecturerId) {
+        var attendance = attendanceRepository.findById(attendanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance not found"));
+
+        // verify lecturer owns the offering for this attendance
+        if (attendance.getSchedule() == null || attendance.getSchedule().getOffering() == null) {
+            throw new ResourceNotFoundException("Associated schedule/offering not found");
+        }
+        if (lecturerId != null) {
+            verifyOwnership(attendance.getSchedule().getOffering().getId(), lecturerId);
+        }
+
+        if (dto.getStatus() != null && !dto.getStatus().isBlank()) {
+            attendance.setStatus(dto.getStatus());
+        }
+        if (dto.getAttendanceDate() != null) {
+            attendance.setAttendanceDate(dto.getAttendanceDate());
+        }
+        if (dto.getNotes() != null) {
+            attendance.setNotes(dto.getNotes());
+        }
+
+        return attendanceRepository.save(attendance);
+    }
+
+    @Override
+    public void deleteAttendance(long attendanceId, Long lecturerId) {
+        var attendance = attendanceRepository.findById(attendanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance not found"));
+        if (attendance.getSchedule() == null || attendance.getSchedule().getOffering() == null) {
+            throw new ResourceNotFoundException("Associated schedule/offering not found");
+        }
+        if (lecturerId != null) {
+            verifyOwnership(attendance.getSchedule().getOffering().getId(), lecturerId);
+        }
+        attendanceRepository.delete(attendance);
+    }
+
+    @Override
+    public List<Attendance> getAttendanceRecords(long scheduleId, Long lecturerId) {
         ClassSchedule schedule = classScheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
 
-        verifyOwnership(schedule.getOffering().getId(), lecturerId);
-        return attendanceRepository.findByScheduleId(scheduleId);
+        if (lecturerId != null) {
+            verifyOwnership(schedule.getOffering().getId(), lecturerId);
+        }
+        List<Attendance> rows = attendanceRepository.findByScheduleId(scheduleId);
+        // Initialize lazy associations while still in transaction to avoid
+        // LazyInitializationException during JSON serialization
+        for (Attendance a : rows) {
+            if (a.getEnrollment() != null) {
+                var enrol = a.getEnrollment();
+                if (enrol.getStudent() != null) {
+                    enrol.getStudent().getId();
+                    enrol.getStudent().getFirstName();
+                    enrol.getStudent().getLastName();
+                }
+                enrol.getId();
+            }
+            if (a.getRecordedBy() != null) {
+                a.getRecordedBy().getId();
+            }
+            if (a.getSchedule() != null) {
+                a.getSchedule().getId();
+            }
+        }
+        return rows;
+    }
+
+    @Override
+    public java.util.List<java.util.Map<String, Object>> getAttendanceRecordsAsDto(long scheduleId, Long lecturerId) {
+        System.out.println(
+                "[DEBUG] getAttendanceRecordsAsDto start for scheduleId=" + scheduleId + ", lecturerId=" + lecturerId);
+        java.util.List<java.util.Map<String, Object>> out = new java.util.ArrayList<>();
+        try {
+            List<Attendance> rows = attendanceRepository.findByScheduleIdWithStudent(scheduleId);
+            System.out.println("[DEBUG] loaded attendance rows count=" + (rows == null ? 0 : rows.size()));
+            for (Attendance a : rows) {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id", a.getId());
+                m.put("attendanceDate", a.getAttendanceDate());
+                m.put("status", a.getStatus());
+                m.put("notes", a.getNotes());
+                if (a.getEnrollment() != null && a.getEnrollment().getStudent() != null) {
+                    var student = a.getEnrollment().getStudent();
+                    java.util.Map<String, Object> s = new java.util.LinkedHashMap<>();
+                    s.put("id", student.getId());
+                    s.put("firstName", student.getFirstName());
+                    s.put("lastName", student.getLastName());
+                    s.put("email", student.getEmail());
+                    s.put("fullName", student.getFullName());
+                    m.put("student", s);
+                }
+                if (a.getRecordedBy() != null) {
+                    var rb = a.getRecordedBy();
+                    java.util.Map<String, Object> r = new java.util.LinkedHashMap<>();
+                    r.put("id", rb.getId());
+                    r.put("fullName", rb.getFullName());
+                    m.put("recordedBy", r);
+                }
+                if (a.getRecordedAt() != null) {
+                    m.put("recordedAt", a.getRecordedAt().toString());
+                }
+                out.add(m);
+            }
+            System.out.println("[DEBUG] mapped dto count=" + out.size());
+            return out;
+        } catch (Exception ex) {
+            System.err.println("[ERROR] getAttendanceRecordsAsDto failed: " + ex.getMessage());
+            ex.printStackTrace();
+            // fallback: try to load with the previous method (will initialize lazies)
+            try {
+                List<Attendance> rows = getAttendanceRecords(scheduleId, lecturerId);
+                for (Attendance a : rows) {
+                    java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                    m.put("id", a.getId());
+                    m.put("attendanceDate", a.getAttendanceDate());
+                    m.put("status", a.getStatus());
+                    m.put("notes", a.getNotes());
+                    if (a.getEnrollment() != null && a.getEnrollment().getStudent() != null) {
+                        var student = a.getEnrollment().getStudent();
+                        java.util.Map<String, Object> s = new java.util.LinkedHashMap<>();
+                        s.put("id", student.getId());
+                        s.put("firstName", student.getFirstName());
+                        s.put("lastName", student.getLastName());
+                        s.put("email", student.getEmail());
+                        s.put("fullName", student.getFullName());
+                        m.put("student", s);
+                    }
+                    if (a.getRecordedBy() != null) {
+                        var rb = a.getRecordedBy();
+                        java.util.Map<String, Object> r = new java.util.LinkedHashMap<>();
+                        r.put("id", rb.getId());
+                        r.put("fullName", rb.getFullName());
+                        m.put("recordedBy", r);
+                    }
+                    if (a.getRecordedAt() != null) {
+                        m.put("recordedAt", a.getRecordedAt().toString());
+                    }
+                    out.add(m);
+                }
+            } catch (Exception ex2) {
+                System.err.println("[ERROR] fallback mapping also failed: " + ex2.getMessage());
+                ex2.printStackTrace();
+            }
+            return out;
+        }
     }
 
     @Override

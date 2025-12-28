@@ -77,6 +77,29 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional
+    public int bulkAssignLecturerToAllOfferings(Long lecturerId) {
+        var lecturer = userRepository.findById(lecturerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lecturer not found with id: " + lecturerId));
+        List<CourseOffering> offerings = courseOfferingRepository.findAll();
+        int created = 0;
+        for (CourseOffering off : offerings) {
+            boolean exists = courseLecturerRepository.existsByOfferingIdAndLecturerId(off.getId(), lecturerId);
+            if (exists)
+                continue;
+            CourseLecturer cl = new CourseLecturer();
+            cl.setOffering(off);
+            cl.setLecturer(lecturer);
+            cl.setPrimary(false);
+            courseLecturerRepository.save(cl);
+            created++;
+        }
+        System.out.println(
+                "[ADMIN] bulkAssignLecturerToAllOfferings created=" + created + " for lecturerId=" + lecturerId);
+        return created;
+    }
+
+    @Override
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }

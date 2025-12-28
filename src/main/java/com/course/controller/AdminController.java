@@ -169,6 +169,19 @@ public class AdminController {
         return ResponseEntity.ok(java.util.Collections.singletonMap("status", "success"));
     }
 
+    /**
+     * Bulk assign a lecturer to all offerings. Idempotent.
+     * Example: POST /api/admin/offerings/assign-all?lecturerId=1
+     */
+    @PostMapping("/offerings/assign-all")
+    public ResponseEntity<Map<String, Object>> assignLecturerToAllOfferings(@RequestParam Long lecturerId) {
+        int created = adminService.bulkAssignLecturerToAllOfferings(lecturerId);
+        Map<String, Object> res = new java.util.HashMap<>();
+        res.put("status", "success");
+        res.put("created", created);
+        return ResponseEntity.ok(res);
+    }
+
     @PutMapping("/offerings/{id}")
     public ResponseEntity<?> updateOffering(@PathVariable Long id,
             @RequestBody Map<String, Object> request) {
@@ -258,32 +271,62 @@ public class AdminController {
 
     // ===== Schedule Management =====
     @GetMapping("/schedules")
-    public ResponseEntity<List<ClassSchedule>> getAllSchedules() {
-        return ResponseEntity.ok(adminService.getAllSchedules());
+    public ResponseEntity<List<com.course.dto.schedule.ClassScheduleDTO>> getAllSchedules() {
+        return ResponseEntity.ok(com.course.dto.schedule.ClassScheduleMapper.toDtoList(adminService.getAllSchedules()));
     }
 
     @GetMapping("/schedules/{id}")
-    public ResponseEntity<ClassSchedule> getScheduleById(@PathVariable Long id) {
-        return ResponseEntity.ok(adminService.getScheduleById(id));
+    public ResponseEntity<com.course.dto.schedule.ClassScheduleDTO> getScheduleById(@PathVariable Long id) {
+        return ResponseEntity.ok(com.course.dto.schedule.ClassScheduleMapper.toDto(adminService.getScheduleById(id)));
     }
 
     @GetMapping("/schedules/offering/{offeringId}")
-    public ResponseEntity<List<ClassSchedule>> getSchedulesByOffering(@PathVariable Long offeringId) {
-        return ResponseEntity.ok(adminService.getSchedulesByOffering(offeringId));
+    public ResponseEntity<List<com.course.dto.schedule.ClassScheduleDTO>> getSchedulesByOffering(
+            @PathVariable Long offeringId) {
+        return ResponseEntity.ok(
+                com.course.dto.schedule.ClassScheduleMapper.toDtoList(adminService.getSchedulesByOffering(offeringId)));
     }
 
     @GetMapping("/schedules/room/{roomId}")
-    public ResponseEntity<List<ClassSchedule>> getSchedulesByRoom(@PathVariable Long roomId) {
-        return ResponseEntity.ok(adminService.getSchedulesByRoom(roomId));
+    public ResponseEntity<List<com.course.dto.schedule.ClassScheduleDTO>> getSchedulesByRoom(
+            @PathVariable Long roomId) {
+        return ResponseEntity
+                .ok(com.course.dto.schedule.ClassScheduleMapper.toDtoList(adminService.getSchedulesByRoom(roomId)));
     }
 
     @PostMapping("/schedules")
     public ResponseEntity<?> createSchedule(@RequestBody Map<String, Object> request) {
         Long offeringId = Long.valueOf(request.get("offeringId").toString());
-        Long roomId = Long.valueOf(request.get("roomId").toString());
+        Long roomId = null;
+        if (request.containsKey("roomId") && request.get("roomId") != null
+                && !request.get("roomId").toString().isBlank()) {
+            roomId = Long.valueOf(request.get("roomId").toString());
+        }
         String dayOfWeek = request.get("dayOfWeek").toString();
         java.time.LocalTime startTime = java.time.LocalTime.parse(request.get("startTime").toString());
         java.time.LocalTime endTime = java.time.LocalTime.parse(request.get("endTime").toString());
+        // If roomId not provided, attempt to create a room using building/roomType (if
+        // supplied)
+        if (roomId == null) {
+            String building = request.containsKey("building") && request.get("building") != null
+                    ? request.get("building").toString()
+                    : "";
+            String roomType = request.containsKey("roomType") && request.get("roomType") != null
+                    ? request.get("roomType").toString()
+                    : "";
+            // minimal defaults: use a generated room number if none provided? Expect admin
+            // to supply roomId or building+roomNumber via UI.
+            // If building/roomNumber are provided together, create room; else throw bad
+            // request.
+            if (request.containsKey("roomNumber") && request.get("roomNumber") != null
+                    && !request.get("roomNumber").toString().isBlank()) {
+                String roomNumber = request.get("roomNumber").toString();
+                var room = adminService.createRoom(roomNumber, building, 0, roomType, true);
+                roomId = room.getId();
+            } else {
+                return ResponseEntity.badRequest().body("roomId or roomNumber is required to create a schedule");
+            }
+        }
         adminService.createSchedule(offeringId, roomId, dayOfWeek, startTime, endTime);
         return ResponseEntity.ok(java.util.Collections.singletonMap("status", "success"));
     }
@@ -292,10 +335,30 @@ public class AdminController {
     public ResponseEntity<?> updateSchedule(@PathVariable Long id,
             @RequestBody Map<String, Object> request) {
         Long offeringId = Long.valueOf(request.get("offeringId").toString());
-        Long roomId = Long.valueOf(request.get("roomId").toString());
+        Long roomId = null;
+        if (request.containsKey("roomId") && request.get("roomId") != null
+                && !request.get("roomId").toString().isBlank()) {
+            roomId = Long.valueOf(request.get("roomId").toString());
+        }
         String dayOfWeek = request.get("dayOfWeek").toString();
         java.time.LocalTime startTime = java.time.LocalTime.parse(request.get("startTime").toString());
         java.time.LocalTime endTime = java.time.LocalTime.parse(request.get("endTime").toString());
+        if (roomId == null) {
+            String building = request.containsKey("building") && request.get("building") != null
+                    ? request.get("building").toString()
+                    : "";
+            String roomType = request.containsKey("roomType") && request.get("roomType") != null
+                    ? request.get("roomType").toString()
+                    : "";
+            if (request.containsKey("roomNumber") && request.get("roomNumber") != null
+                    && !request.get("roomNumber").toString().isBlank()) {
+                String roomNumber = request.get("roomNumber").toString();
+                var room = adminService.createRoom(roomNumber, building, 0, roomType, true);
+                roomId = room.getId();
+            } else {
+                return ResponseEntity.badRequest().body("roomId or roomNumber is required to update schedule");
+            }
+        }
         adminService.updateSchedule(id, offeringId, roomId, dayOfWeek, startTime, endTime);
         return ResponseEntity.ok(java.util.Collections.singletonMap("status", "success"));
     }

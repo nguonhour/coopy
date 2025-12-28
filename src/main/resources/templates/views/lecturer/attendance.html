@@ -202,8 +202,9 @@
           </div>
           <div>
             <button
+              id="open-attendance"
               type="button"
-              class="mt-4 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+              class="open-attendance-modal mt-4 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
             >
               <svg
                 class="-ml-1 mr-2 h-5 w-5"
@@ -258,7 +259,7 @@
         <div class="mt-6">
           <button
             type="button"
-            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            class="open-attendance-modal inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
           >
             <svg
               class="-ml-1 mr-2 h-5 w-5"
@@ -353,7 +354,10 @@
                   </div>
                   <div class="ml-3">
                     <div class="text-sm font-medium text-gray-900">
-                      Student Name
+                      <span
+                        th:text="${record.enrollment != null && record.enrollment.student != null ? record.enrollment.student.fullName : 'Student'}"
+                        >Student Name</span
+                      >
                     </div>
                   </div>
                 </div>
@@ -395,6 +399,152 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Mark Attendance Modal -->
+      <div
+        id="attendance-modal"
+        class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50"
+      >
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
+          <h3 class="text-lg font-medium text-gray-900">Record Attendance</h3>
+          <p class="text-sm text-gray-500 mt-1">
+            Select student and status, then save.
+          </p>
+          <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700"
+              >Student</label
+            >
+            <select
+              id="attendance-student"
+              class="mt-1 block w-full rounded-md border-gray-300"
+            >
+              <option value="">-- Select student --</option>
+              <th:block th:if="${students != null}">
+                <th:block th:each="s : ${students}">
+                  <option
+                    th:value="${s.id}"
+                    th:text="${s.firstName + ' ' + s.lastName + ' (' + s.email + ')'}"
+                  ></option>
+                </th:block>
+              </th:block>
+            </select>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700"
+                >Status</label
+              >
+              <select
+                id="attendance-status"
+                class="mt-1 block w-full rounded-md border-gray-300"
+              >
+                <option value="PRESENT">PRESENT</option>
+                <option value="ABSENT">ABSENT</option>
+                <option value="LATE">LATE</option>
+                <option value="EXCUSED">EXCUSED</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700"
+                >Date</label
+              >
+              <input
+                id="attendance-date"
+                type="date"
+                class="mt-1 block w-full rounded-md border-gray-300"
+              />
+            </div>
+          </div>
+          <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700">Notes</label>
+            <textarea
+              id="attendance-notes"
+              class="mt-1 block w-full rounded-md border-gray-300"
+              rows="3"
+            ></textarea>
+          </div>
+          <div class="mt-6 flex justify-end gap-3">
+            <button
+              id="attendance-cancel"
+              class="px-4 py-2 bg-gray-200 rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              id="attendance-save"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-md"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <script th:inline="javascript">
+        // modal handling
+        const modal = document.getElementById("attendance-modal");
+        const openBtns = document.querySelectorAll(".open-attendance-modal");
+        const cancelBtn = document.getElementById("attendance-cancel");
+        const saveBtn = document.getElementById("attendance-save");
+
+        openBtns.forEach((b) => {
+          b.addEventListener("click", () => {
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+          });
+        });
+
+        cancelBtn.addEventListener("click", () => {
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+        });
+
+        saveBtn.addEventListener("click", async () => {
+          const studentId = document.getElementById("attendance-student").value;
+          const status = document.getElementById("attendance-status").value;
+          const date = document.getElementById("attendance-date").value;
+          const notes = document.getElementById("attendance-notes").value;
+          const scheduleId = /*[[${scheduleId}]]*/ "null";
+          const lecturerId = /*[[${lecturerId}]]*/ "null";
+          if (!studentId) {
+            alert("Select a student");
+            return;
+          }
+          if (!scheduleId || scheduleId === "null") {
+            alert("Missing scheduleId");
+            return;
+          }
+          // build body
+          const body = {
+            scheduleId: parseInt(scheduleId),
+            lecturerId:
+              lecturerId && lecturerId !== "null" ? parseInt(lecturerId) : null,
+            attendanceDate: date
+              ? date
+              : new Date().toISOString().substring(0, 10),
+            notes: notes,
+          };
+          try {
+            const q = `?studentId=${encodeURIComponent(
+              studentId
+            )}&status=${encodeURIComponent(status)}`;
+            const res = await fetch("/api/lecturer/attendance" + q, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+              const t = await res.text();
+              alert("Failed to record attendance: " + t);
+            } else {
+              alert("Attendance recorded");
+              location.reload();
+            }
+          } catch (err) {
+            alert("Error: " + err);
+          }
+        });
+      </script>
 
       <div
         class="mt-6 bg-white shadow-sm rounded-xl border border-slate-200 p-6"

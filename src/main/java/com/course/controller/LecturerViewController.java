@@ -159,6 +159,26 @@ public class LecturerViewController {
                 model.addAttribute("lecturerId", lecturerId);
                 var enrollments = adminService.getEnrollmentsByOffering(offeringId);
                 model.addAttribute("enrollments", enrollments);
+                // Build student list for the template (template expects `students`)
+                java.util.List<com.course.entity.User> students = new java.util.ArrayList<>();
+                if (enrollments != null) {
+                    for (Object o : enrollments) {
+                        try {
+                            com.course.entity.Enrollment e = (com.course.entity.Enrollment) o;
+                            if (e != null && e.getStudent() != null) {
+                                // only include students with ENROLLED status
+                                if (e.getStatus() == null || "ENROLLED".equalsIgnoreCase(e.getStatus())) {
+                                    students.add(e.getStudent());
+                                }
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                System.out.println("[DEBUG] LecturerViewController.students offeringId=" + offeringId
+                        + ", enrollmentsCount=" + (enrollments == null ? 0 : enrollments.size())
+                        + ", studentsCount=" + (students == null ? 0 : students.size()));
+                model.addAttribute("students", students);
                 // Provide an enrollmentMap for template lookup; populate map keyed by student
                 // id
                 java.util.Map<Long, Object> enrollmentMap = new java.util.HashMap<>();
@@ -190,6 +210,24 @@ public class LecturerViewController {
             @RequestParam(required = false) Long lecturerId,
             Model model) {
         // TODO: After enabling security, get lecturerId from Authentication
+        // If lecturer provided but no schedule selected, try to auto-select the first
+        // schedule for one of the lecturer's offerings so the page shows useful data
+        if (lecturerId != null && scheduleId == null) {
+            try {
+                var offerings = lecturerService.getOfferingsByLecturerId(lecturerId);
+                if (offerings != null) {
+                    for (var off : offerings) {
+                        var classSchedules = classScheduleRepository.findByOfferingId(off.getId());
+                        if (classSchedules != null && !classSchedules.isEmpty()) {
+                            scheduleId = classSchedules.get(0).getId();
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
         if (scheduleId != null && lecturerId != null) {
             model.addAttribute("scheduleId", scheduleId);
             model.addAttribute("lecturerId", lecturerId);

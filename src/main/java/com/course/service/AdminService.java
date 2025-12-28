@@ -111,4 +111,8 @@ public interface AdminService {
         void assignLecturersToOffering(Long offeringId, List<Long> lecturerIds);
 
         void removeLecturerFromOffering(Long offeringId, Long lecturerId);
+
+        // Bulk assign a lecturer to all existing offerings (safe, idempotent)
+        // Returns number of new assignments created
+        int bulkAssignLecturerToAllOfferings(Long lecturerId);
 }

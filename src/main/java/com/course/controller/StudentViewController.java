@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.course.service.StudentService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Controller
+@Slf4j
 @RequestMapping("/student")
 @RequiredArgsConstructor
 public class StudentViewController {
@@ -26,6 +28,9 @@ public class StudentViewController {
             model.addAttribute("studentId", studentId);
             model.addAttribute("enrollments", studentService.getMyEnrollments(studentId));
             model.addAttribute("terms", studentService.getActiveTerms());
+            model.addAttribute("gpa", studentService.calculateGPA(studentId));
+            model.addAttribute("creditsEarned", studentService.getCreditsEarned(studentId));
+            model.addAttribute("coursesCompleted", studentService.getCoursesCompleted(studentId));
         }
         return "views/student/dashboard";
     }
@@ -34,7 +39,7 @@ public class StudentViewController {
     public String courses(@RequestParam(required = false) Long studentId, Model model) {
         if (studentId != null) {
             model.addAttribute("studentId", studentId);
-            model.addAttribute("terms", studentService.getActiveTerms());
+            model.addAttribute("terms", studentService.getAllTerms());
         }
         return "views/student/courses";
     }
@@ -52,7 +57,16 @@ public class StudentViewController {
     public String schedule(@RequestParam(required = false) Long studentId, Model model) {
         if (studentId != null) {
             model.addAttribute("studentId", studentId);
-            model.addAttribute("schedule", studentService.getMySchedule(studentId));
+            var sched = studentService.getMySchedule(studentId);
+            if (sched == null || sched.isEmpty()) {
+                log.info("Student {} schedule is empty or null", studentId);
+            } else {
+                log.info("Student {} schedule entries: {}", studentId, sched.size());
+                sched.forEach(s -> log.debug("Schedule entry: offeringId={}, day={}, start={}, end={}",
+                        s.getOffering() != null ? s.getOffering().getId() : null,
+                        s.getDayOfWeek(), s.getStartTime(), s.getEndTime()));
+            }
+            model.addAttribute("schedule", sched);
         }
         return "views/student/schedule";
     }
@@ -62,6 +76,11 @@ public class StudentViewController {
         if (studentId != null) {
             model.addAttribute("studentId", studentId);
             model.addAttribute("grades", studentService.getMyGrades(studentId));
+            // Add summary values so the grades page can display GPA, credits and completed
+            // count
+            model.addAttribute("gpa", studentService.calculateGPA(studentId));
+            model.addAttribute("creditsEarned", studentService.getCreditsEarned(studentId));
+            model.addAttribute("coursesCompleted", studentService.getCoursesCompleted(studentId));
         }
         return "views/student/grades";
     }
@@ -97,42 +116,40 @@ public class StudentViewController {
     public ResponseEntity<String> exportGrades(@RequestParam Long studentId) {
         StringBuilder csv = new StringBuilder();
         csv.append("Course Code,Course Title,Credits,Grade,Status\n");
-        
+
         for (var enrollment : studentService.getMyGrades(studentId)) {
             csv.append(String.format("%s,%s,%d,%s,%s\n",
-                enrollment.getOffering().getCourse().getCourseCode(),
-                enrollment.getOffering().getCourse().getTitle(),
-                enrollment.getOffering().getCourse().getCredits(),
-                enrollment.getGrade() != null ? enrollment.getGrade() : "N/A",
-                enrollment.getStatus()
-            ));
+                    enrollment.getOffering().getCourse().getCourseCode(),
+                    enrollment.getOffering().getCourse().getTitle(),
+                    enrollment.getOffering().getCourse().getCredits(),
+                    enrollment.getGrade() != null ? enrollment.getGrade() : "N/A",
+                    enrollment.getStatus()));
         }
-        
+
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=my-grades.csv")
-            .contentType(MediaType.parseMediaType("text/csv"))
-            .body(csv.toString());
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=my-grades.csv")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv.toString());
     }
 
     @GetMapping("/schedule/export")
     public ResponseEntity<String> exportSchedule(@RequestParam Long studentId) {
         StringBuilder csv = new StringBuilder();
         csv.append("Course,Day,Start Time,End Time,Room,Building\n");
-        
+
         for (var schedule : studentService.getMySchedule(studentId)) {
             csv.append(String.format("%s,%s,%s,%s,%s,%s\n",
-                schedule.getOffering().getCourse().getTitle(),
-                schedule.getDayOfWeek(),
-                schedule.getStartTime(),
-                schedule.getEndTime(),
-                schedule.getRoom().getRoomNumber(),
-                schedule.getRoom().getBuilding()
-            ));
+                    schedule.getOffering().getCourse().getTitle(),
+                    schedule.getDayOfWeek(),
+                    schedule.getStartTime(),
+                    schedule.getEndTime(),
+                    schedule.getRoom().getRoomNumber(),
+                    schedule.getRoom().getBuilding()));
         }
-        
+
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=my-schedule.csv")
-            .contentType(MediaType.parseMediaType("text/csv"))
-            .body(csv.toString());
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=my-schedule.csv")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv.toString());
     }
 }

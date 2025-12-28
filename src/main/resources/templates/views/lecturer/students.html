@@ -330,13 +330,13 @@
               </td>
               <td
                 class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                th:text="${enrollments[iterStat.index]?.enrolledAt != null ? #temporals.format(enrollments[iterStat.index].enrolledAt, 'yyyy-MM-dd') : 'N/A'}"
+                th:text="${enrollmentMap[student.id]?.enrolledAt != null ? #temporals.format(enrollmentMap[student.id].enrolledAt, 'yyyy-MM-dd') : 'N/A'}"
               >
                 2025-12-26
               </td>
               <td
                 class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                th:text="${enrollments[iterStat.index]?.offering?.term?.endDate != null ? #temporals.format(enrollments[iterStat.index].offering.term.endDate, 'yyyy-MM-dd') : 'N/A'}"
+                th:text="${enrollmentMap[student.id]?.offering?.term?.endDate != null ? #temporals.format(enrollmentMap[student.id].offering.term.endDate, 'yyyy-MM-dd') : 'N/A'}"
               >
                 2026-01-31
               </td>
