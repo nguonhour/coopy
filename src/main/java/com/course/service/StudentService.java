@@ -22,4 +22,20 @@ public interface StudentService {
 
     // Terms
     List<AcademicTerm> getActiveTerms();
+
+    // All terms (including past/future) for dropdowns
+    List<AcademicTerm> getAllTerms();
+
+    // Offerings available to a student (not already enrolled)
+    java.util.List<com.course.entity.CourseOffering> getAvailableOfferings(Long studentId, Long termId, String keyword);
+
+    // Enroll student into offering
+    com.course.entity.Enrollment enrollInOffering(Long studentId, Long offeringId);
+
+    // Academic summaries
+    double calculateGPA(Long studentId);
+
+    int getCreditsEarned(Long studentId);
+
+    int getCoursesCompleted(Long studentId);
 }

@@ -10,6 +10,9 @@ import com.course.service.LecturerService;
 import com.course.service.AdminService;
 import com.course.repository.RoleRepository;
 import com.course.repository.ClassScheduleRepository;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import com.course.entity.Enrollment;
 
 /**
  * Controller for rendering Lecturer HTML views (Thymeleaf templates)
@@ -154,7 +157,43 @@ public class LecturerViewController {
             try {
                 model.addAttribute("offeringId", offeringId);
                 model.addAttribute("lecturerId", lecturerId);
-                model.addAttribute("students", lecturerService.getEnrolledStudents(offeringId, lecturerId));
+                var enrollments = adminService.getEnrollmentsByOffering(offeringId);
+                model.addAttribute("enrollments", enrollments);
+                // Build student list for the template (template expects `students`)
+                java.util.List<com.course.entity.User> students = new java.util.ArrayList<>();
+                if (enrollments != null) {
+                    for (Object o : enrollments) {
+                        try {
+                            com.course.entity.Enrollment e = (com.course.entity.Enrollment) o;
+                            if (e != null && e.getStudent() != null) {
+                                // only include students with ENROLLED status
+                                if (e.getStatus() == null || "ENROLLED".equalsIgnoreCase(e.getStatus())) {
+                                    students.add(e.getStudent());
+                                }
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                System.out.println("[DEBUG] LecturerViewController.students offeringId=" + offeringId
+                        + ", enrollmentsCount=" + (enrollments == null ? 0 : enrollments.size())
+                        + ", studentsCount=" + (students == null ? 0 : students.size()));
+                model.addAttribute("students", students);
+                // Provide an enrollmentMap for template lookup; populate map keyed by student
+                // id
+                java.util.Map<Long, Object> enrollmentMap = new java.util.HashMap<>();
+                if (enrollments != null) {
+                    for (Object o : enrollments) {
+                        try {
+                            com.course.entity.Enrollment e = (com.course.entity.Enrollment) o;
+                            if (e != null && e.getStudent() != null && e.getStudent().getId() != null) {
+                                enrollmentMap.put(e.getStudent().getId(), e);
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                model.addAttribute("enrollmentMap", enrollmentMap);
             } catch (Exception ex) {
                 model.addAttribute("error", ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred");
             }
@@ -169,12 +208,79 @@ public class LecturerViewController {
     public String attendance(
             @RequestParam(required = false) Long scheduleId,
             @RequestParam(required = false) Long lecturerId,
+            @RequestParam(required = false) Long studentId,
+            @RequestParam(required = false) Long offeringId,
             Model model) {
         // TODO: After enabling security, get lecturerId from Authentication
+        // If lecturer provided but no schedule selected, try to auto-select the first
+        // schedule for one of the lecturer's offerings so the page shows useful data
+        if (lecturerId != null && scheduleId == null) {
+            try {
+                var offerings = lecturerService.getOfferingsByLecturerId(lecturerId);
+                if (offerings != null) {
+                    for (var off : offerings) {
+                        var classSchedules = classScheduleRepository.findByOfferingId(off.getId());
+                        if (classSchedules != null && !classSchedules.isEmpty()) {
+                            scheduleId = classSchedules.get(0).getId();
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        // Provide schedules for the lecturer so the template can show a selector
+        if (lecturerId != null) {
+            try {
+                java.util.List<com.course.entity.ClassSchedule> schedules = new java.util.ArrayList<>();
+                var offerings = lecturerService.getOfferingsByLecturerId(lecturerId);
+                if (offerings != null) {
+                    for (var off : offerings) {
+                        try {
+                            var classSchedules = classScheduleRepository.findByOfferingId(off.getId());
+                            if (classSchedules != null) {
+                                schedules.addAll(classSchedules);
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                model.addAttribute("schedules", schedules);
+            } catch (Exception ignored) {
+                model.addAttribute("schedules", new java.util.ArrayList<>());
+            }
+        }
+
+        // Pass through an initial studentId (if any) so the attendance modal can
+        // preselect
+        if (studentId != null) {
+            model.addAttribute("initialStudentId", studentId);
+        } else {
+            model.addAttribute("initialStudentId", null);
+        }
+        // Also provide offeringId if supplied to help auto-select schedules
+        if (offeringId != null) {
+            model.addAttribute("offeringId", offeringId);
+        }
+
         if (scheduleId != null && lecturerId != null) {
             model.addAttribute("scheduleId", scheduleId);
             model.addAttribute("lecturerId", lecturerId);
             model.addAttribute("attendanceRecords", lecturerService.getAttendanceRecords(scheduleId, lecturerId));
+            // Also load enrolled students for this schedule's offering so lecturer can mark
+            // attendance
+            try {
+                var schedOpt = classScheduleRepository.findById(scheduleId);
+                if (schedOpt.isPresent() && schedOpt.get().getOffering() != null) {
+                    Long offId = schedOpt.get().getOffering().getId();
+                    var students = lecturerService.getEnrolledStudents(offId, lecturerId);
+                    model.addAttribute("students", students);
+                } else {
+                    model.addAttribute("students", new java.util.ArrayList<>());
+                }
+            } catch (Exception ex) {
+                model.addAttribute("students", new java.util.ArrayList<>());
+            }
         }
         return "views/lecturer/attendance";
     }
