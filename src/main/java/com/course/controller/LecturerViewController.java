@@ -272,8 +272,8 @@ public class LecturerViewController {
             try {
                 var schedOpt = classScheduleRepository.findById(scheduleId);
                 if (schedOpt.isPresent() && schedOpt.get().getOffering() != null) {
-                    Long offeringId = schedOpt.get().getOffering().getId();
-                    var students = lecturerService.getEnrolledStudents(offeringId, lecturerId);
+                    Long offId = schedOpt.get().getOffering().getId();
+                    var students = lecturerService.getEnrolledStudents(offId, lecturerId);
                     model.addAttribute("students", students);
                 } else {
                     model.addAttribute("students", new java.util.ArrayList<>());
