@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
   </head>
   <body class="bg-slate-100 font-sans">
+
     <!-- Sidebar Navigation -->
     <aside class="fixed left-0 top-0 h-full w-64 bg-slate-900 text-white z-10">
       <div class="flex flex-col h-full">
@@ -37,7 +38,7 @@
               <p class="text-xs text-slate-400">ID: <span th:text="${studentId}">1</span></p>
             </div>
           </div>
-          <a href="/logout" class="mt-4 flex items-center px-4 py-2 text-sm text-red-400 rounded-lg hover:bg-slate-800 transition">
+          <a th:href="@{/signout}" class="mt-4 flex items-center px-4 py-2 text-sm text-red-400 rounded-lg hover:bg-slate-800 transition">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>Logout
           </a>
         </div>

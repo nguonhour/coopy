@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign Up</title>
+    <link th:href="@{/css/output.css}" rel="stylesheet" />
+  </head>
+  <body class="min-h-screen flex items-center justify-center bg-gray-50">
+    <div th:insert="fragments/header :: header"></div>
+    <div class="max-w-md w-full bg-white p-8 rounded shadow">
+      <h2 class="text-2xl mb-4">Create account</h2>
+      <form method="post" th:action="@{/api/auth/signup}">
+        <div class="mb-3">
+          <label class="block">First name</label>
+          <input name="firstName" required class="w-full border p-2 rounded" />
+        </div>
+        <div class="mb-3">
+          <label class="block">Last name</label>
+          <input name="lastName" required class="w-full border p-2 rounded" />
+        </div>
+        <div class="mb-3">
+          <label class="block">Email</label>
+          <input
+            name="email"
+            type="email"
+            required
+            class="w-full border p-2 rounded"
+          />
+        </div>
+        <div class="mb-3">
+          <label class="block">Password</label>
+          <input
+            name="password"
+            type="password"
+            required
+            class="w-full border p-2 rounded"
+          />
+        </div>
+        <div class="flex items-center justify-between">
+          <button
+            type="submit"
+            class="bg-green-600 text-white px-4 py-2 rounded"
+          >
+            Sign Up
+          </button>
+          <a th:href="@{/signin}" class="text-sm text-blue-600">Sign in</a>
+        </div>
+      </form>
+    </div>
+  </body>
+</html>
