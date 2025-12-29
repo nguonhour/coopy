@@ -11,4 +11,8 @@ public class UserUpdateRequest {
     private Long roleId;
     private Boolean active;
     private String password; // Optional - only if changing password
+    // Profile fields
+    private String dob; // ISO date or dd/MM/yyyy
+    private String phone;
+    private String bio;
 }

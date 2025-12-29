@@ -23,6 +23,7 @@ public class AdminServiceImpl implements AdminService {
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
     private final CourseOfferingRepository courseOfferingRepository;
+    private final com.course.service.CourseService courseService;
     private final EnrollmentRepository enrollmentRepository;
     private final ClassScheduleRepository classScheduleRepository;
     private final RoomRepository roomRepository;
@@ -158,6 +159,8 @@ public class AdminServiceImpl implements AdminService {
         offering.setTerm(term);
         offering.setCapacity(capacity);
         offering.setActive(isActive != null ? isActive : true);
+        // Ensure enrollment code is set (generate from course code)
+        offering.setEnrollmentCode(courseService.generateEnrollmentCode(course.getCourseCode()));
 
         return courseOfferingRepository.save(offering);
     }

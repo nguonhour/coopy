@@ -31,6 +31,7 @@ public class LecturerServiceImpl implements LecturerService {
     private final com.course.repository.CourseOfferingRepository courseOfferingRepository;
     private final com.course.repository.CourseRepository courseRepository;
     private final com.course.repository.AcademicTermRepository academicTermRepository;
+    private final com.course.service.CourseService courseService;
 
     public LecturerServiceImpl(CourseLecturerRepository courseLecturerRepository,
             AttendanceRepository attendanceRepository,
@@ -38,7 +39,8 @@ public class LecturerServiceImpl implements LecturerService {
             EnrollmentRepository enrollmentRepository,
             com.course.repository.CourseOfferingRepository courseOfferingRepository,
             com.course.repository.CourseRepository courseRepository,
-            com.course.repository.AcademicTermRepository academicTermRepository) {
+            com.course.repository.AcademicTermRepository academicTermRepository,
+            com.course.service.CourseService courseService) {
         this.attendanceRepository = attendanceRepository;
         this.classScheduleRepository = classScheduleRepository;
         this.enrollmentRepository = enrollmentRepository;
@@ -46,6 +48,7 @@ public class LecturerServiceImpl implements LecturerService {
         this.courseOfferingRepository = courseOfferingRepository;
         this.courseRepository = courseRepository;
         this.academicTermRepository = academicTermRepository;
+        this.courseService = courseService;
     }
 
     @Override
@@ -154,6 +157,8 @@ public class LecturerServiceImpl implements LecturerService {
             verifyOwnership(schedule.getOffering().getId(), lecturerId);
         }
         List<Attendance> rows = attendanceRepository.findByScheduleId(scheduleId);
+        // Sort by attendanceDate descending (latest first)
+        rows.sort((a, b) -> b.getAttendanceDate().compareTo(a.getAttendanceDate()));
         // Initialize lazy associations while still in transaction to avoid
         // LazyInitializationException during JSON serialization
         for (Attendance a : rows) {
@@ -357,6 +362,16 @@ public class LecturerServiceImpl implements LecturerService {
         if (dto.getActive() != null)
             offering.setActive(dto.getActive());
 
+        // determine enrollment code: use provided or generate a new one
+        if (dto.getEnrollmentCode() != null && !dto.getEnrollmentCode().isBlank()) {
+            if (courseOfferingRepository.existsByEnrollmentCode(dto.getEnrollmentCode())) {
+                throw new IllegalArgumentException("Enrollment code already in use");
+            }
+            offering.setEnrollmentCode(dto.getEnrollmentCode());
+        } else {
+            offering.setEnrollmentCode(courseService.generateEnrollmentCode(course.getCourseCode()));
+        }
+
         offering = courseOfferingRepository.save(offering);
 
         // assign lecturer as primary
@@ -393,6 +408,42 @@ public class LecturerServiceImpl implements LecturerService {
             offering.setCapacity(dto.getCapacity());
         if (dto.getActive() != null)
             offering.setActive(dto.getActive());
+        if (dto.getEnrollmentCode() != null) {
+            String newCode = dto.getEnrollmentCode().trim();
+            if (!newCode.isBlank()) {
+                boolean exists = courseOfferingRepository.existsByEnrollmentCode(newCode);
+                if (exists && (offering.getEnrollmentCode() == null || !offering.getEnrollmentCode().equals(newCode))) {
+                    throw new IllegalArgumentException("Enrollment code already in use");
+                }
+                offering.setEnrollmentCode(newCode);
+            } else {
+                // if blank explicitly, ignore to avoid violating NOT NULL DB constraint
+            }
+        }
+        return courseOfferingRepository.save(offering);
+    }
+
+    @Override
+    public com.course.entity.CourseOffering getOfferingById(long lecturerId, long offeringId) {
+        verifyOwnership(offeringId, lecturerId);
+        return courseOfferingRepository.findById(offeringId)
+                .orElseThrow(() -> new ResourceNotFoundException("Offering not found"));
+    }
+
+    @Override
+    public com.course.entity.CourseOffering regenerateOfferingEnrollmentCode(long lecturerId, long offeringId) {
+        verifyOwnership(offeringId, lecturerId);
+        var offering = courseOfferingRepository.findById(offeringId)
+                .orElseThrow(() -> new ResourceNotFoundException("Offering not found"));
+        String newCode;
+        int attempts = 0;
+        do {
+            newCode = courseService.generateEnrollmentCode(offering.getCourse().getCourseCode());
+            attempts++;
+            if (attempts > 10)
+                break; // safety
+        } while (courseOfferingRepository.existsByEnrollmentCode(newCode));
+        offering.setEnrollmentCode(newCode);
         return courseOfferingRepository.save(offering);
     }
 

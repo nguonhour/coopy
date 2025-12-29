@@ -45,4 +45,8 @@ public interface LecturerService {
 
         java.util.List<com.course.entity.CourseOffering> getOfferingsByLecturerId(long lecturerId);
 
+        com.course.entity.CourseOffering getOfferingById(long lecturerId, long offeringId);
+
+        com.course.entity.CourseOffering regenerateOfferingEnrollmentCode(long lecturerId, long offeringId);
+
 }

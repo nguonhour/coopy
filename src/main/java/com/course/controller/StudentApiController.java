@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/students")
@@ -26,9 +27,17 @@ public class StudentApiController {
     }
 
     @PostMapping("/{studentId}/enroll/{offeringId}")
-    public ResponseEntity<?> enrollInOffering(@PathVariable Long studentId, @PathVariable Long offeringId) {
+    public ResponseEntity<?> enrollInOffering(@PathVariable Long studentId, @PathVariable Long offeringId,
+            @RequestParam(required = false) String enrollmentCode,
+            @RequestBody(required = false) Map<String, String> payload) {
         try {
-            Enrollment e = studentService.enrollInOffering(studentId, offeringId);
+            if (enrollmentCode == null && payload != null) {
+                enrollmentCode = payload.get("enrollmentCode");
+            }
+            if (enrollmentCode == null) {
+                return ResponseEntity.badRequest().body("Enrollment code is required");
+            }
+            Enrollment e = studentService.enrollInOffering(studentId, offeringId, enrollmentCode);
             return ResponseEntity.ok(e);
         } catch (IllegalArgumentException ia) {
             return ResponseEntity.badRequest().body(ia.getMessage());

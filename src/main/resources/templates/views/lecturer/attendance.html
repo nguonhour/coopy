@@ -352,8 +352,10 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
+            <!-- Only show today's records by default -->
             <tr
               th:each="record : ${attendanceRecords}"
+              th:if="${record.attendanceDate != null and record.attendanceDate.equals(T(java.time.LocalDate).now())}"
               class="hover:bg-gray-50"
             >
               <td
@@ -406,11 +408,33 @@
               >
                 <button
                   type="button"
-                  class="text-indigo-600 hover:text-indigo-900 mr-3"
+                  class="text-indigo-400 cursor-not-allowed mr-3"
+                  disabled
+                  th:if="${record.attendanceDate != null and record.attendanceDate.equals(T(java.time.LocalDate).now())}"
                 >
                   Edit
                 </button>
-                <button type="button" class="text-red-600 hover:text-red-900">
+                <button
+                  type="button"
+                  class="text-red-400 cursor-not-allowed"
+                  disabled
+                  th:if="${record.attendanceDate != null and record.attendanceDate.equals(T(java.time.LocalDate).now())}"
+                >
+                  Delete
+                </button>
+                <!-- For non-today records, show normal Edit/Delete -->
+                <button
+                  type="button"
+                  class="text-indigo-600 hover:text-indigo-900 mr-3"
+                  th:if="${record.attendanceDate == null or !record.attendanceDate.equals(T(java.time.LocalDate).now())}"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="text-red-600 hover:text-red-900"
+                  th:if="${record.attendanceDate == null or !record.attendanceDate.equals(T(java.time.LocalDate).now())}"
+                >
                   Delete
                 </button>
               </td>
@@ -558,6 +582,8 @@
               alert("Failed to record attendance: " + t);
             } else {
               alert("Attendance recorded");
+              modal.classList.add("hidden");
+              modal.classList.remove("flex");
               location.reload();
             }
           } catch (err) {

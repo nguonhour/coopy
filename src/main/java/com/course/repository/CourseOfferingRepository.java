@@ -39,4 +39,10 @@ public interface CourseOfferingRepository extends JpaRepository<CourseOffering, 
 
     @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.offering.id = :offeringId AND e.status = 'ENROLLED'")
     Long countEnrolledStudents(@Param("offeringId") Long offeringId);
+
+    // Check existence of an enrollment code (used to validate uniqueness before
+    // update)
+    boolean existsByEnrollmentCode(String enrollmentCode);
+
+    Optional<CourseOffering> findByEnrollmentCode(String enrollmentCode);
 }

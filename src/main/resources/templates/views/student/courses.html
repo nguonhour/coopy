@@ -167,6 +167,11 @@
       }
 
       async function enrollInCourse(offeringId) {
+        const code = prompt("Enter the enrollment code for this course:");
+        if (!code) {
+          alert("Enrollment code is required.");
+          return;
+        }
         if (!confirm("Are you sure you want to enroll in this course?")) return;
 
         try {
@@ -174,6 +179,8 @@
             `/api/students/${studentId}/enroll/${offeringId}`,
             {
               method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ enrollmentCode: code })
             }
           );
 

@@ -14,6 +14,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.MediaType;
 
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -69,6 +73,56 @@ public class AdminController {
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/users/{id}")
+    public ResponseEntity<User> getUserById(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getUserById(id));
+    }
+
+    @GetMapping("/users/{id}/profile")
+    public ResponseEntity<com.course.dto.user.UserProfileDTO> getUserProfile(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getUserProfile(id));
+    }
+
+    @PostMapping(path = "/users/{id}/avatar", consumes = "multipart/form-data")
+    public ResponseEntity<?> uploadAvatar(@PathVariable Long id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            userService.updateAvatar(id, file);
+            return ResponseEntity.ok(java.util.Collections.singletonMap("status", "success"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(java.util.Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping(path = "/users/{id}/avatar-image")
+    public ResponseEntity<org.springframework.core.io.Resource> getAvatarImage(@PathVariable Long id) {
+        try {
+            org.springframework.core.io.Resource res = userService.loadAvatarResource(id);
+            if (res == null) {
+                // serve default avatar from classpath
+                ClassPathResource def = new ClassPathResource("static/images/default-avatar.svg");
+                if (!def.exists())
+                    return ResponseEntity.notFound().build();
+                return ResponseEntity.ok()
+                        .header("Cache-Control", "max-age=3600")
+                        .contentType(MediaType.parseMediaType("image/svg+xml"))
+                        .body(def);
+            }
+            String contentType = null;
+            try {
+                contentType = Files.probeContentType(Paths.get(res.getURI()));
+            } catch (Exception ex) {
+                // ignore
+            }
+            if (contentType == null)
+                contentType = "application/octet-stream";
+            return ResponseEntity.ok().header("Cache-Control", "max-age=3600")
+                    .contentType(org.springframework.http.MediaType.parseMediaType(contentType)).body(res);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
     }
 
     // ===== Course Management =====

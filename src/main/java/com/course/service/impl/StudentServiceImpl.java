@@ -69,9 +69,12 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     @org.springframework.transaction.annotation.Transactional
-    public com.course.entity.Enrollment enrollInOffering(Long studentId, Long offeringId) {
+    public com.course.entity.Enrollment enrollInOffering(Long studentId, Long offeringId, String enrollmentCode) {
         var off = courseOfferingRepository.findById(offeringId)
                 .orElseThrow(() -> new com.course.exception.ResourceNotFoundException("Offering not found"));
+        if (enrollmentCode == null || !off.getEnrollmentCode().equals(enrollmentCode)) {
+            throw new IllegalArgumentException("Invalid enrollment code");
+        }
         var already = enrollmentRepository.findByStudentIdAndOfferingId(studentId, offeringId);
         if (already.isPresent()) {
             throw new IllegalArgumentException("Student already enrolled");

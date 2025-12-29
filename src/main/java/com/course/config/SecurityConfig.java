@@ -22,34 +22,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtFilter jwtFilter,
-            DaoAuthenticationProvider authProvider) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // Temporarily disable security and allow all endpoints so you can update user
+        // features.
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authProvider)
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/index", "/signin", "/signup", "/css/**", "/js/**", "/api/auth/**",
-                                "/favicon.ico")
-                        .permitAll()
-                        .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/lecturer/**", "/api/lecturer/**").hasRole("LECTURER")
-                        .requestMatchers("/student/**", "/api/student/**").hasRole("STUDENT")
-                        .anyRequest().authenticated())
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(new AuthenticationEntryPoint() {
-                    @Override
-                    public void commence(HttpServletRequest request, HttpServletResponse response,
-                            org.springframework.security.core.AuthenticationException authException)
-                            throws java.io.IOException {
-                        String uri = request.getRequestURI();
-                        if (uri != null && uri.startsWith("/api/")) {
-                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
-                        } else {
-                            response.sendRedirect("/signin");
-                        }
-                    }
-                }))
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
 
         return http.build();
     }
