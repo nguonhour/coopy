@@ -72,11 +72,11 @@ public class AuthController {
 
         String role = user.getRole().getRoleCode();
         if ("ADMIN".equalsIgnoreCase(role))
-            return "redirect:/admin";
+            return "redirect:/admin/dashboard?adminId=" + user.getId();
         if ("LECTURER".equalsIgnoreCase(role))
-            return "redirect:/lecturer";
+            return "redirect:/lecturer/dashboard?lecturerId=" + user.getId();
         if ("STUDENT".equalsIgnoreCase(role))
-            return "redirect:/student";
+            return "redirect:/student/dashboard?studentId=" + user.getId();
         return "redirect:/";
     }
 
@@ -104,7 +104,7 @@ public class AuthController {
         cookie.setPath("/");
         response.addCookie(cookie);
 
-        return "redirect:/student";
+        return "redirect:/student/dashboard?studentId=" + user.getId();
     }
 
     @GetMapping("/signout")
