@@ -29,8 +29,8 @@ public interface StudentService {
     // Offerings available to a student (not already enrolled)
     java.util.List<com.course.entity.CourseOffering> getAvailableOfferings(Long studentId, Long termId, String keyword);
 
-    // Enroll student into offering
-    com.course.entity.Enrollment enrollInOffering(Long studentId, Long offeringId);
+    // Enroll student into offering (with enrollment code)
+    com.course.entity.Enrollment enrollInOffering(Long studentId, Long offeringId, String enrollmentCode);
 
     // Academic summaries
     double calculateGPA(Long studentId);

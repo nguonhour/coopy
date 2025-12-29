@@ -135,6 +135,37 @@ public class LecturerController {
         return ResponseEntity.ok(offering);
     }
 
+    @GetMapping("/offerings/{id}")
+    public ResponseEntity<?> getOffering(@PathVariable("id") long id, @RequestParam long lecturerId) {
+        try {
+            var offering = lecturerService.getOfferingById(lecturerId, id);
+            return ResponseEntity.ok(offering);
+        } catch (ResourceNotFoundException rnfe) {
+            return ResponseEntity.status(404).body(java.util.Collections.singletonMap("message", rnfe.getMessage()));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(java.util.Collections.singletonMap("message", se.getMessage()));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.status(500).body(java.util.Collections.singletonMap("message", ex.toString()));
+        }
+    }
+
+    @PostMapping("/offerings/{id}/regenerate")
+    public ResponseEntity<?> regenerateOfferingCode(@PathVariable("id") long id, @RequestParam long lecturerId) {
+        try {
+            var offering = lecturerService.regenerateOfferingEnrollmentCode(lecturerId, id);
+            return ResponseEntity
+                    .ok(java.util.Collections.singletonMap("enrollmentCode", offering.getEnrollmentCode()));
+        } catch (ResourceNotFoundException rnfe) {
+            return ResponseEntity.status(404).body(java.util.Collections.singletonMap("message", rnfe.getMessage()));
+        } catch (SecurityException se) {
+            return ResponseEntity.status(403).body(java.util.Collections.singletonMap("message", se.getMessage()));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.status(500).body(java.util.Collections.singletonMap("message", ex.toString()));
+        }
+    }
+
     @DeleteMapping("/offerings/{id}")
     public ResponseEntity<?> deleteOffering(@PathVariable("id") long id, @RequestParam long lecturerId) {
         lecturerService.deleteCourseOffering(lecturerId, id);

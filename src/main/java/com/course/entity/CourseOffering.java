@@ -43,6 +43,9 @@ public class CourseOffering {
     public CourseOffering() {
     }
 
+    @Column(name = "enrollment_code", nullable = false, unique = true, length = 16)
+    private String enrollmentCode;
+
     public Long getId() {
         return id;
     }
@@ -89,5 +92,13 @@ public class CourseOffering {
 
     public void setLecturers(List<CourseLecturer> lecturers) {
         this.lecturers = lecturers;
+    }
+
+    public String getEnrollmentCode() {
+        return enrollmentCode;
+    }
+
+    public void setEnrollmentCode(String enrollmentCode) {
+        this.enrollmentCode = enrollmentCode;
     }
 }
