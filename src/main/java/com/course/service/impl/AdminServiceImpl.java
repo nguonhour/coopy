@@ -7,6 +7,7 @@ import com.course.repository.*;
 import com.course.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;

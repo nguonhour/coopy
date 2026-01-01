@@ -5,6 +5,8 @@ import com.course.entity.User;
 import com.course.repository.RoleRepository;
 import com.course.repository.UserRepository;
 import com.course.config.JwtService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,6 +23,8 @@ import java.util.List;
 
 @Controller
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -54,16 +58,20 @@ public class AuthController {
 
     @PostMapping("/api/auth/signin")
     public String signin(@RequestParam String email, @RequestParam String password, HttpServletResponse response) {
+        log.info("Login attempt for email: {}", email);
         var user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
+            log.warn("Login failed: user not found for email: {}", email);
             return "redirect:/signin?error";
         }
 
         // manual password check to avoid AuthenticationManager configuration issues
         if (!passwordEncoder.matches(password, user.getPassword())) {
+            log.warn("Login failed: incorrect password for email: {}", email);
             return "redirect:/signin?error";
         }
 
+        log.info("Login successful for email: {}, role: {}", email, user.getRole().getRoleCode());
         String token = jwtService.generateToken(user.getEmail(), List.of(user.getRole().getRoleCode()));
         Cookie cookie = new Cookie("JWT", token);
         cookie.setHttpOnly(true);
@@ -71,13 +79,18 @@ public class AuthController {
         response.addCookie(cookie);
 
         String role = user.getRole().getRoleCode();
-        if ("ADMIN".equalsIgnoreCase(role))
-            return "redirect:/admin";
-        if ("LECTURER".equalsIgnoreCase(role))
-            return "redirect:/lecturer";
-        if ("STUDENT".equalsIgnoreCase(role))
-            return "redirect:/student";
-        return "redirect:/";
+        String redirectUrl;
+        if ("ADMIN".equalsIgnoreCase(role)) {
+            redirectUrl = "/admin/dashboard?adminId=" + user.getId();
+        } else if ("LECTURER".equalsIgnoreCase(role)) {
+            redirectUrl = "/lecturer/dashboard?lecturerId=" + user.getId();
+        } else if ("STUDENT".equalsIgnoreCase(role)) {
+            redirectUrl = "/student/dashboard?studentId=" + user.getId();
+        } else {
+            redirectUrl = "/";
+        }
+        log.info("Redirecting to: {}", redirectUrl);
+        return "redirect:" + redirectUrl;
     }
 
     @PostMapping("/api/auth/signup")
@@ -104,7 +117,7 @@ public class AuthController {
         cookie.setPath("/");
         response.addCookie(cookie);
 
-        return "redirect:/student";
+        return "redirect:/student/dashboard?studentId=" + user.getId();
     }
 
     @GetMapping("/signout")

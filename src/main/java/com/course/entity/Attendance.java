@@ -3,11 +3,13 @@ package com.course.entity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "attendance", uniqueConstraints = {
         @UniqueConstraint(columnNames = { "enrollment_id", "schedule_id", "attendance_date" })
 })
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 public class Attendance {
 
     @Id

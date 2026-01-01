@@ -4,6 +4,7 @@ import com.course.entity.*;
 import com.course.repository.*;
 import com.course.service.StudentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +14,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@PreAuthorize("hasRole('STUDENT')")
 public class StudentServiceImpl implements StudentService {
 
     private final EnrollmentRepository enrollmentRepository;
@@ -79,7 +81,8 @@ public class StudentServiceImpl implements StudentService {
         if (already.isPresent()) {
             throw new IllegalArgumentException("Student already enrolled");
         }
-        long enrolledCount = courseOfferingRepository.countEnrolledStudents(offeringId);
+        Long enrolledCountNullable = courseOfferingRepository.countEnrolledStudents(offeringId);
+        long enrolledCount = enrolledCountNullable == null ? 0L : enrolledCountNullable;
         if (enrolledCount >= off.getCapacity()) {
             throw new IllegalStateException("Offering is full");
         }
@@ -199,5 +202,92 @@ public class StudentServiceImpl implements StudentService {
             count++;
         }
         return count;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void dropEnrollment(Long studentId, Long enrollmentId) {
+        var enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new com.course.exception.ResourceNotFoundException("Enrollment not found"));
+        if (enrollment.getStudent() == null || !enrollment.getStudent().getId().equals(studentId)) {
+            throw new SecurityException("Student does not have permission to drop this enrollment");
+        }
+        enrollment.setStatus("DROPPED");
+        enrollmentRepository.save(enrollment);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public com.course.entity.Enrollment restoreEnrollment(Long studentId, Long enrollmentId) {
+        var enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new com.course.exception.ResourceNotFoundException("Enrollment not found"));
+        if (enrollment.getStudent() == null || !enrollment.getStudent().getId().equals(studentId)) {
+            throw new SecurityException("Student does not have permission to restore this enrollment");
+        }
+        if (!"DROPPED".equalsIgnoreCase(enrollment.getStatus())) {
+            throw new IllegalArgumentException("Only dropped enrollments can be restored");
+        }
+        Long offeringId = enrollment.getOffering() == null ? null : enrollment.getOffering().getId();
+        if (offeringId == null) {
+            throw new com.course.exception.ResourceNotFoundException("Associated offering not found");
+        }
+        Long enrolledCountNullable = courseOfferingRepository.countEnrolledStudents(offeringId);
+        long enrolledCount = enrolledCountNullable == null ? 0L : enrolledCountNullable;
+        var off = enrollment.getOffering();
+        if (off != null && enrolledCount >= off.getCapacity()) {
+            throw new IllegalStateException("Offering is full; cannot re-enroll");
+        }
+        enrollment.setStatus("ENROLLED");
+        return enrollmentRepository.save(enrollment);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void deleteEnrollment(Long studentId, Long enrollmentId) {
+        var enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new com.course.exception.ResourceNotFoundException("Enrollment not found"));
+        if (enrollment.getStudent() == null || !enrollment.getStudent().getId().equals(studentId)) {
+            throw new SecurityException("Student does not have permission to delete this enrollment");
+        }
+        if (!"DROPPED".equalsIgnoreCase(enrollment.getStatus())) {
+            throw new IllegalArgumentException("Only dropped enrollments can be deleted by student");
+        }
+        enrollmentRepository.delete(enrollment);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public com.course.entity.Attendance submitAttendanceRequest(Long studentId, Long scheduleId,
+            java.time.LocalDate attendanceDate, String notes) {
+        var schedule = classScheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new com.course.exception.ResourceNotFoundException("Schedule not found"));
+
+        var enrollment = enrollmentRepository.findByStudentIdAndOfferingId(studentId, schedule.getOffering().getId())
+                .orElseThrow(() -> new com.course.exception.ResourceNotFoundException(
+                        "Enrollment not found for student/offering"));
+
+        boolean exists = attendanceRepository.existsByStudentIdAndScheduleId(studentId, scheduleId, enrollment.getId(),
+                attendanceDate);
+        if (exists) {
+            throw new IllegalArgumentException("Attendance already submitted for this date");
+        }
+
+        com.course.entity.Attendance a = new com.course.entity.Attendance();
+        a.setEnrollment(enrollment);
+        a.setSchedule(schedule);
+        a.setAttendanceDate(attendanceDate);
+        a.setStatus("REQUESTED");
+        com.course.entity.User student = new com.course.entity.User();
+        student.setId(studentId);
+        a.setRecordedBy(student);
+        if (notes != null) {
+            a.setNotes(notes);
+        }
+        try {
+            return attendanceRepository.save(a);
+        } catch (org.springframework.dao.DataIntegrityViolationException dive) {
+            // likely unique constraint violation due to concurrent request
+            throw new IllegalArgumentException("Attendance already submitted for this date");
+        }
     }
 }

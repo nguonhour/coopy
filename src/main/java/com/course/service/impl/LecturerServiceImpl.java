@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.course.dto.attendance.AttendanceRequestDTO;
 import com.course.entity.Attendance;
@@ -22,6 +23,8 @@ import jakarta.transaction.Transactional;
 
 @Service
 @Transactional
+// @PreAuthorize("hasRole('LECTURER')") // temporarily disabled for testing
+// approve flow
 public class LecturerServiceImpl implements LecturerService {
 
     private final CourseLecturerRepository courseLecturerRepository;

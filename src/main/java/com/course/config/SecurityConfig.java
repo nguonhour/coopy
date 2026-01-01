@@ -8,6 +8,7 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -19,16 +20,43 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // Temporarily disable security and allow all endpoints so you can update user
-        // features.
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtFilter jwtFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/",
+                                "/index",
+                                "/home",
+                                "/signin",
+                                "/signup",
+                                "/api/auth/**",
+                                "/css/**",
+                                "/js/**",
+                                "/assets/**",
+                                "/images/**")
+                        .permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/lecturer/**").hasRole("LECTURER")
+                        // temporarily allow API access for lecturer endpoints to simplify testing
+                        .requestMatchers("/api/lecturer/**").permitAll()
+                        .requestMatchers("/qr/generate").hasAnyRole("LECTURER", "ADMIN")
+                        .requestMatchers("/qr/**").authenticated()
+                        .requestMatchers("/student/**").hasRole("STUDENT")
+                        .requestMatchers("/api/student/**").hasRole("STUDENT")
+                        .requestMatchers("/api/users/me/**").authenticated()
+                        .requestMatchers("/api/attendance-code/**").authenticated()
+                        .requestMatchers("/api/attendance/**").authenticated()
+                        .anyRequest().authenticated())
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(
+                        (request, response, authException) -> response.sendRedirect("/signin")))
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

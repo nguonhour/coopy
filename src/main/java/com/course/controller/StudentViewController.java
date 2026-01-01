@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.course.service.StudentService;
+import com.course.util.SecurityHelper;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 public class StudentViewController {
 
     private final StudentService studentService;
+    private final SecurityHelper securityHelper;
 
     @GetMapping("/dashboard")
     public String dashboard(@RequestParam(required = false) Long studentId, Model model) {
@@ -92,14 +96,42 @@ public class StudentViewController {
             Model model) {
         if (studentId != null) {
             model.addAttribute("studentId", studentId);
-            model.addAttribute("enrollments", studentService.getMyEnrollments(studentId));
-            if (offeringId != null) {
-                model.addAttribute("offeringId", offeringId);
-                model.addAttribute("attendance", studentService.getMyAttendance(studentId, offeringId));
-                model.addAttribute("percentage", studentService.getAttendancePercentage(studentId, offeringId));
+            // Only invoke StudentService methods when the current principal has the STUDENT
+            // role.
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isStudent = auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_STUDENT".equals(a.getAuthority()));
+            if (isStudent) {
+                model.addAttribute("enrollments", studentService.getMyEnrollments(studentId));
+                if (offeringId != null) {
+                    model.addAttribute("offeringId", offeringId);
+                    model.addAttribute("attendance", studentService.getMyAttendance(studentId, offeringId));
+                    model.addAttribute("percentage", studentService.getAttendancePercentage(studentId, offeringId));
+                    var schedules = studentService.getMySchedule(studentId).stream()
+                            .filter(s -> s.getOffering() != null && s.getOffering().getId().equals(offeringId))
+                            .toList();
+                    model.addAttribute("schedules", schedules);
+                }
+            } else {
+                // For non-student principals, avoid calling secured service methods to prevent
+                // AuthorizationDeniedException during view rendering. Provide safe defaults.
+                model.addAttribute("enrollments", java.util.Collections.emptyList());
+                if (offeringId != null) {
+                    model.addAttribute("offeringId", offeringId);
+                    model.addAttribute("attendance", java.util.Collections.emptyList());
+                    model.addAttribute("percentage", 0.0);
+                    model.addAttribute("schedules", java.util.Collections.emptyList());
+                }
             }
         }
         return "views/student/attendance";
+    }
+
+    @GetMapping("/enter-code")
+    public String enterCode(@RequestParam(required = false) Long studentId, Model model) {
+        if (studentId != null)
+            model.addAttribute("studentId", studentId);
+        return "views/student/enter-code";
     }
 
     @GetMapping("/waitlist")

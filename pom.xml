@@ -111,6 +111,17 @@
             <groupId>nz.net.ultraq.thymeleaf</groupId>
             <artifactId>thymeleaf-layout-dialect</artifactId>
         </dependency>
+        <!-- QR code generation -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.1</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -122,6 +133,28 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>11.7.2</version>
+                <configuration>
+                    <url>jdbc:mysql://100.66.138.23:3306/enrollment_db?useSSL=false&amp;serverTimezone=UTC&amp;allowPublicKeyRetrieval=true</url>
+                    <user>dararith</user>
+                    <password>0977349080</password>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.mysql</groupId>
+                        <artifactId>mysql-connector-j</artifactId>
+                        <version>9.2.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.flywaydb</groupId>
+                        <artifactId>flyway-mysql</artifactId>
+                        <version>11.7.2</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
     </build>
