@@ -32,6 +32,21 @@ public interface StudentService {
     // Enroll student into offering (with enrollment code)
     com.course.entity.Enrollment enrollInOffering(Long studentId, Long offeringId, String enrollmentCode);
 
+    // Student initiated drop
+    void dropEnrollment(Long studentId, Long enrollmentId);
+
+    // Student submits attendance request (will be recorded with status 'REQUESTED'
+    // and
+    // processed by lecturer/admin)
+    com.course.entity.Attendance submitAttendanceRequest(Long studentId, Long scheduleId,
+            java.time.LocalDate attendanceDate, String notes);
+
+    // Restore a previously dropped enrollment (student requests to re-enroll)
+    com.course.entity.Enrollment restoreEnrollment(Long studentId, Long enrollmentId);
+
+    // Delete an enrollment record (only allowed for the student and typically when DROPPED)
+    void deleteEnrollment(Long studentId, Long enrollmentId);
+
     // Academic summaries
     double calculateGPA(Long studentId);
 

@@ -92,8 +92,19 @@ public class LecturerViewController {
         }
         // Provide chart data using LecturerService: recent attendance (7 days) + role
         // distribution
-        model.addAttribute("systemTotalStudents", adminService.getTotalStudents());
-        model.addAttribute("systemTotalLecturers", adminService.getTotalLecturers());
+        // Only fetch system-wide admin metrics when the current user has ADMIN role
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = false;
+        if (auth != null && auth.getAuthorities() != null) {
+            isAdmin = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        }
+        if (isAdmin) {
+            model.addAttribute("systemTotalStudents", adminService.getTotalStudents());
+            model.addAttribute("systemTotalLecturers", adminService.getTotalLecturers());
+        } else {
+            model.addAttribute("systemTotalStudents", 0);
+            model.addAttribute("systemTotalLecturers", 0);
+        }
 
         if (lecturerId != null) {
             var attendanceMap = lecturerService.getAttendanceCountsByDate(lecturerId, 7);
@@ -108,10 +119,19 @@ public class LecturerViewController {
             var roles = roleRepository.findAll();
             var userLabels = new java.util.ArrayList<String>();
             var userData = new java.util.ArrayList<Number>();
-            for (var r : roles) {
-                long count = adminService.getUsersByRole(r.getRoleCode()).size();
-                userLabels.add(r.getRoleName());
-                userData.add(count);
+            if (isAdmin) {
+                for (var r : roles) {
+                    long count = adminService.getUsersByRole(r.getRoleCode()).size();
+                    userLabels.add(r.getRoleName());
+                    userData.add(count);
+                }
+            } else {
+                // For non-admin lecturers, avoid calling adminService (method-secured)
+                // Provide empty data or zeros so the dashboard renders safely.
+                for (var r : roles) {
+                    userLabels.add(r.getRoleName());
+                    userData.add(0);
+                }
             }
             model.addAttribute("userLabels", userLabels);
             model.addAttribute("userData", userData);
@@ -135,9 +155,19 @@ public class LecturerViewController {
                 model.addAttribute("lecturerId", lecturerId);
                 model.addAttribute("offerings", lecturerService.getOfferingsByLecturerId(lecturerId));
             }
-            // Always provide all courses and all terms for the modal
-            model.addAttribute("courses", adminService.getAllCourses());
-            model.addAttribute("terms", adminService.getAllTerms());
+            // Only fetch admin-level lists if the current user has ADMIN role
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            boolean isAdmin = false;
+            if (auth != null && auth.getAuthorities() != null) {
+                isAdmin = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+            }
+            if (isAdmin) {
+                model.addAttribute("courses", adminService.getAllCourses());
+                model.addAttribute("terms", adminService.getAllTerms());
+            } else {
+                model.addAttribute("courses", new java.util.ArrayList<>());
+                model.addAttribute("terms", new java.util.ArrayList<>());
+            }
         } catch (Exception ex) {
             model.addAttribute("error", ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred");
         }
@@ -317,7 +347,16 @@ public class LecturerViewController {
             model.addAttribute("offerings", new java.util.ArrayList<>());
         }
         // Always provide all terms for the modal
-        model.addAttribute("terms", adminService.getAllTerms());
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = false;
+        if (auth != null && auth.getAuthorities() != null) {
+            isAdmin = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        }
+        if (isAdmin) {
+            model.addAttribute("terms", adminService.getAllTerms());
+        } else {
+            model.addAttribute("terms", new java.util.ArrayList<>());
+        }
         return "views/lecturer/schedule";
     }
 
@@ -334,9 +373,19 @@ public class LecturerViewController {
             // lecturerService.getCourseReports(lecturerId));
         }
         // Provide chart data specific to lecturer: attendance (30 days) and course
-        // performance
-        model.addAttribute("totalStudents", adminService.getTotalStudents());
-        model.addAttribute("totalLecturers", adminService.getTotalLecturers());
+        // performance. Only include global admin metrics for users with ADMIN role.
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = false;
+        if (auth != null && auth.getAuthorities() != null) {
+            isAdmin = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        }
+        if (isAdmin) {
+            model.addAttribute("totalStudents", adminService.getTotalStudents());
+            model.addAttribute("totalLecturers", adminService.getTotalLecturers());
+        } else {
+            model.addAttribute("totalStudents", 0);
+            model.addAttribute("totalLecturers", 0);
+        }
         if (lecturerId != null) {
             var attendanceMap = lecturerService.getAttendanceCountsByDate(lecturerId, 30);
             var attendanceLabels = new java.util.ArrayList<String>(attendanceMap.keySet());

@@ -57,28 +57,53 @@ public class JwtFilter extends OncePerRequestFilter {
             try {
                 Claims claims = jwtService.parseClaims(token);
                 String username = claims.getSubject();
-                log.debug("JwtFilter: token parsed, subject={}", username);
-                @SuppressWarnings("unchecked")
-                List<String> roles = (List<String>) claims.get("roles", List.class);
+                log.info("JwtFilter: token parsed, subject={}", username);
+
+                // Roles are stored as comma-separated string in the JWT
+                List<String> roles = new ArrayList<>();
+                Object rolesObj = claims.get("roles");
+                if (rolesObj instanceof String) {
+                    // Roles stored as comma-separated string
+                    String rolesStr = (String) rolesObj;
+                    if (rolesStr != null && !rolesStr.isEmpty()) {
+                        for (String r : rolesStr.split(",")) {
+                            roles.add(r.trim());
+                        }
+                    }
+                } else if (rolesObj instanceof List) {
+                    // Roles stored as list (fallback)
+                    @SuppressWarnings("unchecked")
+                    List<String> rolesList = (List<String>) rolesObj;
+                    roles.addAll(rolesList);
+                }
+                log.info("JwtFilter: parsed roles={}", roles);
+
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                     if (jwtService.isTokenValid(token, userDetails.getUsername())) {
-                        log.debug("JwtFilter: token valid for user={}", userDetails.getUsername());
+                        log.info("JwtFilter: token valid for user={}", userDetails.getUsername());
                         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-                        if (roles != null) {
+                        if (roles != null && !roles.isEmpty()) {
                             for (String r : roles) {
                                 authorities.add(new SimpleGrantedAuthority("ROLE_" + r));
                             }
                         }
+                        // If the token did not contain roles or parsing failed to produce
+                        // granted authorities, fall back to the authorities provided by
+                        // UserDetails (DB-backed), preserving role-based access.
+                        if (authorities.isEmpty() && userDetails != null) {
+                            userDetails.getAuthorities()
+                                    .forEach(a -> authorities.add(new SimpleGrantedAuthority(a.getAuthority())));
+                        }
                         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(userDetails,
                                 null, authorities);
                         SecurityContextHolder.getContext().setAuthentication(auth);
-                        log.debug("JwtFilter: SecurityContext set for user={} authorities={}",
+                        log.info("JwtFilter: SecurityContext set for user={} authorities={}",
                                 userDetails.getUsername(), authorities);
                     }
                 }
             } catch (Exception ex) {
-                log.debug("JwtFilter: invalid token - {}", ex.getMessage());
+                log.warn("JwtFilter: invalid token - {}", ex.getMessage());
                 // invalid token - ignore and continue
             }
         }

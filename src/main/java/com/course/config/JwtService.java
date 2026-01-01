@@ -39,7 +39,9 @@ public class JwtService {
                 .setSubject(username)
                 .setIssuedAt(now)
                 .setExpiration(exp)
-                .addClaims(Map.of("roles", roles))
+                // store roles as a simple comma-separated string to avoid requiring a JSON
+                // serializer
+                .claim("roles", String.join(",", roles))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

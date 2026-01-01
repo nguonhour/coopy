@@ -8,7 +8,7 @@
     <title>My Courses</title>
   </head>
   <body class="bg-slate-100 font-sans">
-    <div th:replace="fragments/profile :: sidebar(${userId}, ${role})"></div>
+    <div th:replace="~{fragments/profile :: sidebar(${userId}, ${role})}"></div>
     <!-- Error Message Display -->
     <!-- <div th:if="${error}" class="max-w-2xl mx-auto mt-6">
       <div

@@ -8,7 +8,7 @@
     <title>Enrolled Students</title>
   </head>
   <body class="bg-slate-100 font-sans">
-    <div th:replace="fragments/profile :: sidebar(${userId}, ${role})"></div>
+    <div th:replace="~{fragments/profile :: sidebar(${userId}, ${role})}"></div>
 
     <!-- Top Bar -->
     <div class="ml-64 bg-white border-b border-slate-200">

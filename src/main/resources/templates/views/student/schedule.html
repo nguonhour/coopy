@@ -9,7 +9,7 @@
   </head>
   <body class="bg-slate-100 font-sans">
     <!-- Sidebar Navigation -->
-    <div th:replace="fragments/profile :: sidebar(${userId}, ${role})"></div>
+    <div th:replace="~{fragments/profile :: sidebar(${userId}, ${role})}"></div>
     <!-- Main Content -->
     <main class="ml-64 p-8">
       <div class="flex items-center justify-between mb-6">
@@ -17,7 +17,7 @@
         <a
           th:href="@{/student/schedule/export(studentId=${studentId})}"
           th:if="${studentId != null}"
-          class="bg-gray-500 border border-gray-900 text-black px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
+          class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
         >
           <svg
             class="w-5 h-5 mr-2"
