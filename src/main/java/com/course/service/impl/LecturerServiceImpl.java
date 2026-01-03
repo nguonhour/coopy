@@ -72,7 +72,8 @@ public class LecturerServiceImpl implements LecturerService {
     public List<User> getEnrolledStudents(long offeringId, long lecturerId) {
         verifyOwnership(offeringId, lecturerId);
         List<User> students = enrollmentRepository.findByOfferingId(offeringId).stream()
-                .filter(e -> "ENROLLED".equalsIgnoreCase(e.getStatus()))
+                // Include students with null status (default) or ENROLLED status
+                .filter(e -> e.getStatus() == null || "ENROLLED".equalsIgnoreCase(e.getStatus()))
                 .map(Enrollment::getStudent)
                 .collect(Collectors.toList());
         System.out.println("[DEBUG] getEnrolledStudents for offeringId=" + offeringId + ", lecturerId=" + lecturerId);

@@ -208,13 +208,22 @@
         th:if="${attendanceRecords != null and !attendanceRecords.isEmpty()}"
         class="bg-white shadow-sm overflow-hidden rounded-xl border border-slate-200"
       >
-        <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-          <h3 class="text-lg leading-6 font-medium text-gray-900">
-            Attendance Records
-          </h3>
-          <p class="mt-1 text-sm text-gray-500">
-            A list of all attendance records for this class session
-          </p>
+        <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
+          <div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900">
+              Attendance Records
+            </h3>
+            <p class="mt-1 text-sm text-gray-500">
+              A list of all attendance records for this class session
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-sm text-gray-600">Filter:</label>
+            <select id="date-filter" class="rounded-md border-gray-300 text-sm">
+              <option value="today">Today Only</option>
+              <option value="all">All Records</option>
+            </select>
+          </div>
         </div>
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
@@ -257,12 +266,11 @@
               </th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <!-- Only show today's records by default -->
+          <tbody id="attendance-tbody" class="bg-white divide-y divide-gray-200">
             <tr
               th:each="record : ${attendanceRecords}"
-              th:if="${record.attendanceDate != null and record.attendanceDate.equals(T(java.time.LocalDate).now())}"
-              class="hover:bg-gray-50"
+              class="hover:bg-gray-50 attendance-row"
+              th:data-date="${record.attendanceDate}"
             >
               <td
                 class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
@@ -304,43 +312,26 @@
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                <span>-</span>
+                <span th:text="${record.recordedAt != null ? #temporals.format(record.recordedAt, 'HH:mm') : '-'}">-</span>
               </td>
-              <td class="px-6 py-4 text-sm text-gray-500">
+              <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" th:title="${record.notes}">
                 <span th:text="${record.notes ?: '-'}">-</span>
               </td>
               <td
                 class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
               >
+                <!-- Edit button -->
                 <button
                   type="button"
                   class="text-indigo-600 hover:text-indigo-900 mr-3"
-                  th:if="${record.attendanceDate != null and record.attendanceDate.equals(T(java.time.LocalDate).now())}"
-                  th:onclick="|openEditModal(${record.id}, ${record.enrollment != null && record.enrollment.student != null ? record.enrollment.student.id : 'null'}, '${record.status}', ${record.attendanceDate != null ? '\'' + record.attendanceDate + '\'' : 'null'}, ${record.notes != null ? '\'' + record.notes.replace("'","\\'") + '\'' : 'null'})|"
+                  th:onclick="|openEditModal(${record.id}, ${record.enrollment != null && record.enrollment.student != null ? record.enrollment.student.id : 'null'}, '${record.status}', ${record.attendanceDate != null ? '\'' + record.attendanceDate + '\'' : 'null'}, ${record.notes != null ? '\'' + #strings.replace(record.notes, "'", "\\'") + '\'' : 'null'})|"
                 >
                   Edit
                 </button>
+                <!-- Delete button -->
                 <button
                   type="button"
                   class="text-red-600 hover:text-red-900"
-                  th:if="${record.attendanceDate != null and record.attendanceDate.equals(T(java.time.LocalDate).now())}"
-                  th:onclick="|deleteAttendance(${record.id})|"
-                >
-                  Delete
-                </button>
-                <!-- For non-today records, show normal Edit/Delete -->
-                <button
-                  type="button"
-                  class="text-indigo-600 hover:text-indigo-900 mr-3"
-                  th:if="${record.attendanceDate == null or !record.attendanceDate.equals(T(java.time.LocalDate).now())}"
-                  th:onclick="|openEditModal(${record.id}, ${record.enrollment != null && record.enrollment.student != null ? record.enrollment.student.id : 'null'}, '${record.status}', ${record.attendanceDate != null ? '\'' + record.attendanceDate + '\'' : 'null'}, ${record.notes != null ? '\'' + record.notes.replace("'","\\'") + '\'' : 'null'})|"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  class="text-red-600 hover:text-red-900"
-                  th:if="${record.attendanceDate == null or !record.attendanceDate.equals(T(java.time.LocalDate).now())}"
                   th:onclick="|deleteAttendance(${record.id})|"
                 >
                   Delete
@@ -349,7 +340,7 @@
                 <!-- If a student has REQUESTED attendance, show Approve/Reject buttons -->
                 <div
                   th:if="${record.status == 'REQUESTED'}"
-                  class="inline-flex items-center gap-2"
+                  class="inline-flex items-center gap-2 ml-2"
                 >
                   <button
                     type="button"
@@ -455,40 +446,56 @@
 
       <script th:inline="javascript">
         // modal handling
-        const modal = document.getElementById("attendance-modal");
+        const attendanceModal = document.getElementById("attendance-modal");
         const openBtns = document.querySelectorAll(".open-attendance-modal");
         const cancelBtn = document.getElementById("attendance-cancel");
         const saveBtn = document.getElementById("attendance-save");
 
         openBtns.forEach((b) => {
           b.addEventListener("click", () => {
-            modal.classList.remove("hidden");
-            modal.classList.add("flex");
+            if (attendanceModal) {
+              attendanceModal.classList.remove("hidden");
+              attendanceModal.classList.add("flex");
+            }
           });
         });
 
         cancelBtn.addEventListener("click", () => {
-          modal.classList.add("hidden");
-          modal.classList.remove("flex");
+          if (attendanceModal) {
+            attendanceModal.classList.add("hidden");
+            attendanceModal.classList.remove("flex");
+          }
+          // Reset editing state
+          editingAttendanceId = null;
+          editingStudentId = null;
         });
 
         // editing state: null => create, otherwise edit attendance id
         let editingAttendanceId = null;
+        let editingStudentId = null; // store original student when editing
 
         function openEditModal(id, studentId, status, date, notes) {
           editingAttendanceId = id || null;
-          const modal = document.getElementById("attendance-modal");
+          editingStudentId = (studentId && studentId !== 'null') ? studentId : null;
           const sel = document.getElementById("attendance-student");
           const stat = document.getElementById("attendance-status");
           const dt = document.getElementById("attendance-date");
           const nt = document.getElementById("attendance-notes");
-          if (sel && studentId && studentId !== 'null') sel.value = studentId;
+          
+          // Set student - if not in list, it means we're editing and student already exists
+          if (sel && studentId && studentId !== 'null') {
+            sel.value = studentId;
+            // If student not found in dropdown (editing record for student not in current list)
+            if (sel.value != studentId) {
+              console.log('Student ' + studentId + ' not in dropdown, will use stored editingStudentId');
+            }
+          }
           if (stat && status && status !== 'null') stat.value = status;
           if (dt && date && date !== 'null') dt.value = date;
           if (nt) nt.value = (notes && notes !== 'null') ? notes : '';
-          if (modal) {
-            modal.classList.remove("hidden");
-            modal.classList.add("flex");
+          if (attendanceModal) {
+            attendanceModal.classList.remove("hidden");
+            attendanceModal.classList.add("flex");
           }
         }
 
@@ -509,13 +516,19 @@
         }
 
         saveBtn.addEventListener("click", async () => {
-          const studentId = document.getElementById("attendance-student").value;
+          let studentId = document.getElementById("attendance-student").value;
           const status = document.getElementById("attendance-status").value;
           const date = document.getElementById("attendance-date").value;
           const notes = document.getElementById("attendance-notes").value;
           const scheduleId = /*[[${scheduleId}]]*/ "null";
           const lecturerId = /*[[${lecturerId}]]*/ "null";
-          if (!studentId) {
+          
+          // For editing, use stored studentId if dropdown doesn't have the student
+          if (!studentId && editingAttendanceId && editingStudentId) {
+            studentId = editingStudentId;
+          }
+          
+          if (!studentId && !editingAttendanceId) {
             alert("Select a student");
             return;
           }
@@ -532,6 +545,8 @@
               ? date
               : new Date().toISOString().substring(0, 10),
             notes: notes,
+            studentId: parseInt(studentId),
+            status: status
           };
           try {
             if (editingAttendanceId) {
@@ -547,9 +562,9 @@
                 alert('Failed to update attendance: ' + t);
               } else {
                 alert('Attendance updated');
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
+                if (attendanceModal) { attendanceModal.classList.add('hidden'); attendanceModal.classList.remove('flex'); }
                 editingAttendanceId = null;
+                editingStudentId = null;
                 location.reload();
               }
             } else {
@@ -564,8 +579,7 @@
                 alert('Failed to record attendance: ' + t);
               } else {
                 alert('Attendance recorded');
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
+                if (attendanceModal) { attendanceModal.classList.add('hidden'); attendanceModal.classList.remove('flex'); }
                 location.reload();
               }
             }
@@ -598,9 +612,9 @@
           if (sel) {
             sel.value = initialStudentId;
             // open modal automatically
-            if (modal) {
-              modal.classList.remove("hidden");
-              modal.classList.add("flex");
+            if (attendanceModal) {
+              attendanceModal.classList.remove("hidden");
+              attendanceModal.classList.add("flex");
             }
           }
         }
@@ -700,6 +714,35 @@
 
           // fetch code on page load
           fetchCurrentCode();
+
+          // Date filter functionality
+          const dateFilter = document.getElementById('date-filter');
+          function getTodayString() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+          function applyDateFilter() {
+            const filter = dateFilter ? dateFilter.value : 'today';
+            const todayStr = getTodayString();
+            const rows = document.querySelectorAll('.attendance-row');
+            rows.forEach(row => {
+              const rowDate = row.dataset.date || '';
+              const isToday = rowDate === todayStr;
+              if (filter === 'today') {
+                row.style.display = isToday ? '' : 'none';
+              } else {
+                row.style.display = '';
+              }
+            });
+          }
+          if (dateFilter) {
+            dateFilter.addEventListener('change', applyDateFilter);
+            // Apply filter on page load
+            applyDateFilter();
+          }
       </script>
 
       <div
