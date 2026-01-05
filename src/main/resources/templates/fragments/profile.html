@@ -261,6 +261,7 @@
           <input
             id="profilePassword"
             type="password"
+            autocomplete="new-password"
             class="w-full px-3 py-2 border rounded"
           />
         </div>
@@ -333,7 +334,12 @@
 
             // avatar present on profile? show it
             if (p.avatarUrl) {
-              const avatarUrl = "/api/users/me/avatar-image";
+              // Use user-specific avatar URL with userId parameter to show correct user's avatar
+              const avatarUrl =
+                "/api/users/me/avatar-image?userId=" +
+                u.id +
+                "&t=" +
+                Date.now();
               const big = document.getElementById("profileAvatarImg");
               const small = document.getElementById("profileAvatarSmallImg");
               if (big) big.src = avatarUrl;
