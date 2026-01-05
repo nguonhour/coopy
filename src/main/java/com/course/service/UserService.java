@@ -156,30 +156,50 @@ public class UserService {
     }
 
     public User updateAvatar(Long id, MultipartFile file) throws IOException {
-        User user = getUserById(id);
-        if (file == null || file.isEmpty())
-            throw new RuntimeException("No file provided");
-        // ensure directory exists
-        Path uploadDir = Paths.get(avatarDir).toAbsolutePath();
-        Files.createDirectories(uploadDir);
-        String original = file.getOriginalFilename();
-        String ext = "";
-        if (original != null && original.contains(".")) {
-            ext = original.substring(original.lastIndexOf('.'));
+        try {
+            User user = getUserById(id);
+            if (file == null || file.isEmpty())
+                throw new RuntimeException("No file provided");
+
+            // ensure directory exists
+            Path uploadDir = Paths.get(avatarDir).toAbsolutePath();
+            System.out.println("Avatar upload directory: " + uploadDir);
+
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+                System.out.println("Created avatar directory: " + uploadDir);
+            }
+
+            String original = file.getOriginalFilename();
+            String ext = "";
+            if (original != null && original.contains(".")) {
+                ext = original.substring(original.lastIndexOf('.'));
+            }
+
+            String filename = "user_" + id + "_" + System.currentTimeMillis() + ext;
+            Path target = uploadDir.resolve(filename);
+
+            System.out.println("Saving avatar to: " + target);
+            file.transferTo(target.toFile());
+            System.out.println("Avatar file saved successfully");
+
+            // move avatar storage into user_profiles.avatar_url
+            UserProfile profile = userProfileRepository.findByUserId(id)
+                    .orElseGet(() -> {
+                        UserProfile p = new UserProfile();
+                        p.setUser(user);
+                        return p;
+                    });
+            profile.setAvatarUrl(filename);
+            userProfileRepository.save(profile);
+
+            System.out.println("Avatar URL saved to profile: " + filename);
+            return user;
+        } catch (Exception e) {
+            System.err.println("Error in updateAvatar: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
-        String filename = "user_" + id + "_" + System.currentTimeMillis() + ext;
-        Path target = uploadDir.resolve(filename);
-        file.transferTo(target.toFile());
-        // move avatar storage into user_profiles.avatar_url
-        UserProfile profile = userProfileRepository.findByUserId(id)
-                .orElseGet(() -> {
-                    UserProfile p = new UserProfile();
-                    p.setUser(user);
-                    return p;
-                });
-        profile.setAvatarUrl(filename);
-        userProfileRepository.save(profile);
-        return user;
     }
 
     public Resource loadAvatarResource(Long id) throws IOException {

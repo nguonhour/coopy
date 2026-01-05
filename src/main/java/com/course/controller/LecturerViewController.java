@@ -10,9 +10,9 @@ import com.course.service.LecturerService;
 import com.course.service.AdminService;
 import com.course.repository.RoleRepository;
 import com.course.repository.ClassScheduleRepository;
+import com.course.repository.EnrollmentRepository;
 import java.util.Map;
 import java.util.LinkedHashMap;
-import com.course.entity.Enrollment;
 
 /**
  * Controller for rendering Lecturer HTML views (Thymeleaf templates)
@@ -26,13 +26,16 @@ public class LecturerViewController {
     private final AdminService adminService;
     private final RoleRepository roleRepository;
     private final ClassScheduleRepository classScheduleRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     public LecturerViewController(LecturerService lecturerService, AdminService adminService,
-            RoleRepository roleRepository, ClassScheduleRepository classScheduleRepository) {
+            RoleRepository roleRepository, ClassScheduleRepository classScheduleRepository,
+            EnrollmentRepository enrollmentRepository) {
         this.lecturerService = lecturerService;
         this.adminService = adminService;
         this.roleRepository = roleRepository;
         this.classScheduleRepository = classScheduleRepository;
+        this.enrollmentRepository = enrollmentRepository;
     }
 
     /**
@@ -187,42 +190,29 @@ public class LecturerViewController {
             try {
                 model.addAttribute("offeringId", offeringId);
                 model.addAttribute("lecturerId", lecturerId);
-                var enrollments = adminService.getEnrollmentsByOffering(offeringId);
+                // Verify lecturer owns this offering (throws if not)
+                lecturerService.getEnrolledStudents(offeringId, lecturerId);
+
+                // Load enrollments + students for this offering (ENROLLED only)
+                var enrollments = enrollmentRepository.findByOfferingIdWithStudentFiltered(offeringId, "ENROLLED");
                 model.addAttribute("enrollments", enrollments);
-                // Build student list for the template (template expects `students`)
+
                 java.util.List<com.course.entity.User> students = new java.util.ArrayList<>();
+                java.util.Map<Long, com.course.entity.Enrollment> enrollmentMap = new java.util.HashMap<>();
                 if (enrollments != null) {
-                    for (Object o : enrollments) {
-                        try {
-                            com.course.entity.Enrollment e = (com.course.entity.Enrollment) o;
-                            if (e != null && e.getStudent() != null) {
-                                // only include students with ENROLLED status
-                                if (e.getStatus() == null || "ENROLLED".equalsIgnoreCase(e.getStatus())) {
-                                    students.add(e.getStudent());
-                                }
-                            }
-                        } catch (Exception ignored) {
+                    for (com.course.entity.Enrollment e : enrollments) {
+                        if (e != null && e.getStudent() != null && e.getStudent().getId() != null) {
+                            students.add(e.getStudent());
+                            enrollmentMap.put(e.getStudent().getId(), e);
                         }
                     }
                 }
+
                 System.out.println("[DEBUG] LecturerViewController.students offeringId=" + offeringId
                         + ", enrollmentsCount=" + (enrollments == null ? 0 : enrollments.size())
                         + ", studentsCount=" + (students == null ? 0 : students.size()));
+
                 model.addAttribute("students", students);
-                // Provide an enrollmentMap for template lookup; populate map keyed by student
-                // id
-                java.util.Map<Long, Object> enrollmentMap = new java.util.HashMap<>();
-                if (enrollments != null) {
-                    for (Object o : enrollments) {
-                        try {
-                            com.course.entity.Enrollment e = (com.course.entity.Enrollment) o;
-                            if (e != null && e.getStudent() != null && e.getStudent().getId() != null) {
-                                enrollmentMap.put(e.getStudent().getId(), e);
-                            }
-                        } catch (Exception ignored) {
-                        }
-                    }
-                }
                 model.addAttribute("enrollmentMap", enrollmentMap);
             } catch (Exception ex) {
                 model.addAttribute("error", ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred");
@@ -364,13 +354,116 @@ public class LecturerViewController {
      * Render reports page
      */
     @GetMapping("/reports")
-    public String reports(@RequestParam(required = false) Long lecturerId, Model model) {
+    public String reports(
+            @RequestParam(required = false) Long lecturerId,
+            @RequestParam(required = false) Long offeringId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String studentStatus,
+            Model model) {
         // TODO: After enabling security, get lecturerId from Authentication
         if (lecturerId != null) {
             model.addAttribute("lecturerId", lecturerId);
-            // TODO: Fetch reports data from service when implemented
-            // model.addAttribute("courseReports",
-            // lecturerService.getCourseReports(lecturerId));
+        }
+
+        java.time.LocalDate fromDate;
+        java.time.LocalDate toDate;
+        try {
+            fromDate = (from == null || from.isBlank()) ? java.time.LocalDate.now().minusDays(29)
+                    : java.time.LocalDate.parse(from);
+        } catch (Exception ex) {
+            fromDate = java.time.LocalDate.now().minusDays(29);
+        }
+        try {
+            toDate = (to == null || to.isBlank()) ? java.time.LocalDate.now() : java.time.LocalDate.parse(to);
+        } catch (Exception ex) {
+            toDate = java.time.LocalDate.now();
+        }
+        if (toDate.isBefore(fromDate)) {
+            var tmp = fromDate;
+            fromDate = toDate;
+            toDate = tmp;
+        }
+
+        model.addAttribute("filterOfferingId", offeringId);
+        model.addAttribute("filterFrom", fromDate.toString());
+        model.addAttribute("filterTo", toDate.toString());
+        model.addAttribute("filterStudentStatus", studentStatus);
+
+        if (lecturerId != null) {
+            // dropdown options
+            var offerings = lecturerService.getOfferingsByLecturerId(lecturerId);
+            model.addAttribute("offerings", offerings);
+
+            // summary cards (lecturer-only)
+            double avgAttendance = lecturerService.calculateAverageAttendance(lecturerId, fromDate, toDate, offeringId,
+                    studentStatus);
+            model.addAttribute("summaryAvgAttendance", avgAttendance);
+
+            double passRate;
+            if (offeringId != null) {
+                passRate = lecturerService.calculatePassRate(lecturerId, offeringId, studentStatus);
+            } else {
+                // weighted pass rate across offerings
+                double sum = 0.0;
+                int n = 0;
+                for (var off : offerings) {
+                    sum += lecturerService.calculatePassRate(lecturerId, off.getId(), studentStatus);
+                    n++;
+                }
+                passRate = n == 0 ? 0.0 : (sum / n);
+            }
+            model.addAttribute("summaryPassRate", passRate);
+
+            java.util.List<Long> offeringIds = offerings == null ? java.util.List.of()
+                    : offerings.stream().map(o -> o.getId()).toList();
+            if (offeringId != null) {
+                offeringIds = java.util.List.of(offeringId);
+            }
+            String statusToCount = (studentStatus == null || studentStatus.isBlank()) ? "ENROLLED" : studentStatus;
+            long activeEnrollments = offeringIds.isEmpty() ? 0
+                    : enrollmentRepository.countByOfferingIdsAndStatus(offeringIds, statusToCount);
+            model.addAttribute("summaryActiveEnrollments", activeEnrollments);
+
+            long totalClasses = offeringIds.isEmpty() ? 0 : classScheduleRepository.countByOfferingIds(offeringIds);
+            model.addAttribute("summaryTotalClasses", totalClasses);
+
+            // table data
+            model.addAttribute("courseReports", lecturerService.getCourseReports(lecturerId, fromDate, toDate,
+                    studentStatus));
+
+            // optional details when a course is selected
+            if (offeringId != null) {
+                var detail = lecturerService.getDetailedCourseReport(lecturerId, offeringId, fromDate, toDate,
+                        studentStatus);
+                model.addAttribute("courseDetail", detail);
+
+                // grade distribution chart arrays
+                var gradeLabels = new java.util.ArrayList<String>();
+                var gradeData = new java.util.ArrayList<Number>();
+                if (detail != null && detail.getGradeDistribution() != null) {
+                    for (var e : detail.getGradeDistribution().entrySet()) {
+                        gradeLabels.add(e.getKey());
+                        gradeData.add(e.getValue());
+                    }
+                }
+                model.addAttribute("gradeLabels", gradeLabels);
+                model.addAttribute("gradeData", gradeData);
+            } else {
+                model.addAttribute("courseDetail", null);
+                model.addAttribute("gradeLabels", new java.util.ArrayList<String>());
+                model.addAttribute("gradeData", new java.util.ArrayList<Number>());
+            }
+        } else {
+            model.addAttribute("offerings", new java.util.ArrayList<>());
+            model.addAttribute("summaryAvgAttendance", 0.0);
+            model.addAttribute("summaryPassRate", 0.0);
+            model.addAttribute("summaryActiveEnrollments", 0L);
+            model.addAttribute("summaryTotalClasses", 0L);
+            model.addAttribute("courseReports", new java.util.ArrayList<>());
+            model.addAttribute("courseDetail", null);
+            model.addAttribute("gradeLabels", new java.util.ArrayList<String>());
+            model.addAttribute("gradeData", new java.util.ArrayList<Number>());
         }
         // Provide chart data specific to lecturer: attendance (30 days) and course
         // performance. Only include global admin metrics for users with ADMIN role.
@@ -387,7 +480,8 @@ public class LecturerViewController {
             model.addAttribute("totalLecturers", 0);
         }
         if (lecturerId != null) {
-            var attendanceMap = lecturerService.getAttendanceCountsByDate(lecturerId, 30);
+            var attendanceMap = lecturerService.getAttendanceCountsByDateRange(lecturerId, fromDate, toDate, offeringId,
+                    studentStatus);
             var attendanceLabels = new java.util.ArrayList<String>(attendanceMap.keySet());
             var attendanceData = new java.util.ArrayList<Number>();
             for (String k : attendanceLabels) {

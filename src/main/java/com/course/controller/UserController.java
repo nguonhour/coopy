@@ -120,15 +120,33 @@ public class UserController {
             userService.updateAvatar(user.getId(), file);
             return ResponseEntity.ok(Collections.singletonMap("status", "success"));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Collections.singletonMap("error", e.getMessage()));
+            // Log the full error for debugging
+            e.printStackTrace();
+            String errorMsg = e.getMessage();
+            if (errorMsg == null || errorMsg.isEmpty()) {
+                errorMsg = "Avatar upload failed: " + e.getClass().getSimpleName();
+            }
+            return ResponseEntity.status(500).body(Collections.singletonMap("error", errorMsg));
         }
     }
 
     /**
      * Get avatar image for the current authenticated user
+     * 
+     * @deprecated Use /me/avatar-image?userId={id} or /avatar/{userId} instead for
+     *             user-specific avatars
      */
     @GetMapping("/me/avatar-image")
-    public ResponseEntity<Resource> getCurrentUserAvatarImage(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<Resource> getCurrentUserAvatarImage(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) Long userId) {
+
+        // If userId is provided, show that user's avatar (for viewing other profiles)
+        if (userId != null) {
+            return getUserAvatarById(userId);
+        }
+
+        // Otherwise, show current authenticated user's avatar
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
@@ -137,8 +155,23 @@ public class UserController {
             return ResponseEntity.notFound().build();
         }
 
+        return getUserAvatarById(user.getId());
+    }
+
+    /**
+     * Get avatar image for any user by ID (public endpoint)
+     */
+    @GetMapping("/avatar/{userId}")
+    public ResponseEntity<Resource> getUserAvatar(@PathVariable Long userId) {
+        return getUserAvatarById(userId);
+    }
+
+    /**
+     * Helper method to get avatar by user ID
+     */
+    private ResponseEntity<Resource> getUserAvatarById(Long userId) {
         try {
-            Resource res = userService.loadAvatarResource(user.getId());
+            Resource res = userService.loadAvatarResource(userId);
             if (res == null) {
                 // serve default avatar
                 ClassPathResource def = new ClassPathResource("static/images/default-avatar.svg");

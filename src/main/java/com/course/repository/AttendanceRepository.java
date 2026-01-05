@@ -55,4 +55,23 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
         long countByStudentOfferingAndStatus(@Param("studentId") Long studentId, @Param("offeringId") Long offeringId,
                         @Param("status") String status);
 
+        @Query("SELECT COUNT(a) FROM Attendance a WHERE a.schedule.offering.id = :offeringId AND a.attendanceDate BETWEEN :from AND :to AND (:enrollStatus IS NULL OR UPPER(a.enrollment.status) = UPPER(:enrollStatus))")
+        long countByOfferingAndDateRange(@Param("offeringId") Long offeringId,
+                        @Param("from") java.time.LocalDate from,
+                        @Param("to") java.time.LocalDate to,
+                        @Param("enrollStatus") String enrollStatus);
+
+        @Query("SELECT COUNT(a) FROM Attendance a WHERE a.schedule.offering.id = :offeringId AND a.attendanceDate BETWEEN :from AND :to AND a.status IN :statuses AND (:enrollStatus IS NULL OR UPPER(a.enrollment.status) = UPPER(:enrollStatus))")
+        long countByOfferingAndDateRangeWithStatuses(@Param("offeringId") Long offeringId,
+                        @Param("from") java.time.LocalDate from,
+                        @Param("to") java.time.LocalDate to,
+                        @Param("statuses") List<String> statuses,
+                        @Param("enrollStatus") String enrollStatus);
+
+        @Query("SELECT a.attendanceDate, COUNT(a) FROM Attendance a WHERE a.schedule.offering.id IN :offeringIds AND a.attendanceDate BETWEEN :from AND :to AND (:enrollStatus IS NULL OR UPPER(a.enrollment.status) = UPPER(:enrollStatus)) GROUP BY a.attendanceDate ORDER BY a.attendanceDate")
+        List<Object[]> countByOfferingIdsBetween(@Param("offeringIds") List<Long> offeringIds,
+                        @Param("from") java.time.LocalDate from,
+                        @Param("to") java.time.LocalDate to,
+                        @Param("enrollStatus") String enrollStatus);
+
 }

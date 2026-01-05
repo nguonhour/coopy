@@ -20,4 +20,7 @@ public interface ClassScheduleRepository extends JpaRepository<ClassSchedule, Lo
 
     @Query("SELECT cs FROM ClassSchedule cs WHERE cs.id = :scheduleId")
     Optional<ClassSchedule> findScheduleById(@Param("scheduleId") Long scheduleId);
+
+    @Query("SELECT COUNT(cs) FROM ClassSchedule cs WHERE cs.offering.id IN :offeringIds")
+    long countByOfferingIds(@Param("offeringIds") List<Long> offeringIds);
 }
